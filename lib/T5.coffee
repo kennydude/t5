@@ -19,17 +19,17 @@ var __getvar = function(v){
 """
 		@clsCounter = 0
 		@manageClass = """
-// THIS CLASS IS AUTOMATICALLY GENERATED
-function #{@name}(element) {
-this.element = element;
-}
 """
 		@manageItems = {}
+		@manageClassConstructor = ""
 
 	variableDealer : (varname) ->
-		console.log "CALL", varname
 		return """
 __getvar("#{varname}")
+"""
+	manageVariableDealer : (varname) ->
+		return """
+self.#{varname}
 """
 
 	doNodes : (node) ->
@@ -57,10 +57,8 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 					when "data-show"
 						statement = new ls( attr.value )
 						statement.variableDealer = @variableDealer
-						console.log "LS", statement
-
-						console.log statement
 						bf += """if(!(#{statement.toJS()})){ attrs["style"] = "display: none"; }\n"""
+						statement.variableDealer = @manageVariableDealer
 						for v in statement.vars()
 							if !@manageItems[v]
 								@manageItems[v] = []
@@ -68,6 +66,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 							@manageItems[v].push(fname)
 							@manageClass += """
 #{@name}.prototype.#{fname} = function(){
+	var self = this;
 	var s = '';
 	if(!(#{statement.toJS()})){
 		s = 'display: none';
@@ -85,8 +84,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 						bf += """attrs["#{attr.name}"] = "#{attr.value}";""";
 
 		if cEl
-			## TODO: Fix this
-			@manageClass += """
+			@manageClassConstructor += """
 this.el#{@clsCounter} = this.element.getElementsByClassName("t5-#{@clsCounter}");
 """
 
@@ -109,7 +107,7 @@ o += fa.join(" ") + ">";
 				when "#comment"
 					bf += """o += "<!-- #{node.data} -->";"""
 
-		if lc != null
+		if lc != null ## TODO
 			bf = """
 if(#{lc.v}){
 	#{bf}
@@ -131,7 +129,7 @@ if(#{lc.v}){
 			bf = """
 o += "</#{node.nodeName}>";
 """
-			if lc != null
+			if lc != null ## TODO
 				bf = """
 if(#{lc.v}){
 	#{bf}
@@ -146,7 +144,32 @@ if(#{lc.v}){
 		doc = parser.parseFragment str
 
 		@doNodes(doc)
-		@buildFunction += "return o;";
+		@buildFunction += "return o;"
+
+		# Setup watcher things
+		for k, watching of @manageItems
+			# TOOD: deal with object.this.that
+			@manageClassConstructor += """
+Object.defineProperty(this, "#{k}", {
+	get : function(){
+		return self._#{k};
+	},
+	set : function(v){
+		self._#{k} = v;
+		#{"self.#{v}();" for v in watching}
+	}
+});
+
+"""
+		@manageClass = """
+// THIS CLASS IS AUTOMATICALLY GENERATED
+function #{@name}(element) {
+	this.element = element;
+	var self = this;
+#{@manageClassConstructor}
+}
+#{@manageClass}
+"""
 
 		console.log @buildFunction
 
