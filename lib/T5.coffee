@@ -2,17 +2,34 @@
 T5 is a template engine for NodeJS
 '''
 parse5 = require("parse5")
+ls = require("./LogicalStatement")
 
 class T5
 	constructor : (@name) ->
 		@name = @name || "TPL"
 		@buildFunction = """
+// THIS FUNCTION IS AUTOMATICALLY GENERATED
 var o = "";
 var attrs;
+var __getvar = function(v){
+	v = v.split(".");
+	// todo
+};
+
 """
 		@clsCounter = 0
 		@manageClass = """
+// THIS CLASS IS AUTOMATICALLY GENERATED
+function #{@name}(element) {
 this.element = element;
+}
+"""
+		@manageItems = {}
+
+	variableDealer : (varname) ->
+		console.log "CALL", varname
+		return """
+__getvar("#{varname}")
 """
 
 	doNodes : (node) ->
@@ -38,8 +55,27 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 								bf += """if(#{p[1]}){ attrs["class"].push("#{p[0]}")  }"""
 						cEl = true
 					when "data-show"
-						bf += """if(#{attr.value}){ attrs["style"] = "display: none"; }\n"""
-						@manageItems[ 'do' ] = """this.el#{@clsCounter}.style = value ? '' : 'display: none';"""
+						statement = new ls( attr.value )
+						statement.variableDealer = @variableDealer
+						console.log "LS", statement
+
+						console.log statement
+						bf += """if(!(#{statement.toJS()})){ attrs["style"] = "display: none"; }\n"""
+						for v in statement.vars()
+							if !@manageItems[v]
+								@manageItems[v] = []
+							fname = "_inTPL#{@clsCounter}_show"
+							@manageItems[v].push(fname)
+							@manageClass += """
+#{@name}.prototype.#{fname} = function(){
+	var s = '';
+	if(!(#{statement.toJS()})){
+		s = 'display: none';
+	}
+	this.el#{@clsCounter}.style = s;
+};
+
+"""
 						cEl = true
 					when "data-if"
 						## TODO: MAKE THIS WORK IT DOES NOT WORK RIGHT NOW
@@ -49,6 +85,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 						bf += """attrs["#{attr.name}"] = "#{attr.value}";""";
 
 		if cEl
+			## TODO: Fix this
 			@manageClass += """
 this.el#{@clsCounter} = this.element.getElementsByClassName("t5-#{@clsCounter}");
 """
@@ -56,12 +93,13 @@ this.el#{@clsCounter} = this.element.getElementsByClassName("t5-#{@clsCounter}")
 		if node.nodeName.charAt(0) != "#" ## TODO: MAKE THIS SAFER
 			bf += """
 o += "<#{node.nodeName} ";
+var fa = [];
 for(var an in attrs){
 	var av = attrs[an];
 	if(an == "class"){ av = av.join(" "); }
-	o += an + '="' + av + '" ';
+	fa.push( an + '="' + av + '"');
 }
-o += ">";
+o += fa.join(" ") + ">";
 """
 		else
 			console.log node

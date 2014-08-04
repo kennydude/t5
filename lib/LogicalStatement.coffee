@@ -24,6 +24,10 @@ class LogicalStatement
 
 		@res = parser.parse statement
 
+	javascript : () ->
+		return @toJavascript()
+	js : () ->
+		return @toJavascript()
 	toJS : () ->
 		return @toJavascript()
 	toJavascript : (node) ->
@@ -54,6 +58,8 @@ class LogicalStatement
 
 		return o
 
+	vars : () ->
+		return @variables()
 	'''
 	Get all of the variables in this expression
 	'''
