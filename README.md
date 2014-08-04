@@ -1,0 +1,22 @@
+# T5
+
+T5 is a templating engine designed to be very different.
+
+Typically you do this:
+
+	data + template => output
+
+But this only works in one place and it doesn't work well when you want to dynamically
+change the template but not rewrite the DOM (spoiling any CSS effects etc)
+
+T5 works by pre-compiling everything.
+
+More soon haha, this is currently very WIP
+
+## Tests
+
+You should have Mocha installed, but we use CoffeeScript, so run
+
+	./runtest.sh
+
+If you can't use `sh` then use the command inside of it
