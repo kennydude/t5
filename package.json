@@ -1,8 +1,13 @@
 {
   "name": "t5",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kennydude/t5"
+  },
   "version": "0.0.1",
   "description": "T5 is a templating engine focusing on client-side modification and some other groovy things",
   "dependencies": {
+    "ent": "^2.0.0",
     "parse5": "^1.0.0",
     "traverse": "^0.6.6"
   },

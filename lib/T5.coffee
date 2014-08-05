@@ -4,6 +4,7 @@ T5 is a template engine for NodeJS
 parse5 = require("parse5")
 ls = require("./LogicalStatement")
 cs = require("./ConcatStatement")
+ent = require "ent"
 
 class T5Context
 	constructor : () ->
@@ -37,7 +38,7 @@ if (typeof process !== 'undefined' && process.title == "node") {
 		@cntxt = new T5Context()
 
 	build : ->
-		return new Function( @buildFunction )
+		return new Function( "ent", @buildFunction )
 
 	variableDealer : (varname) ->
 		return """
@@ -130,7 +131,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 """
 
 						cEl = true
-					when "data-html"
+					when "data-html", "data-text"
 						statement = new cs( attr.value )
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
@@ -141,12 +142,17 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 								@manageItems[v] = []
 							@manageItems[v].push(fname)
 
+						method = "innerHTML"
+						if attr.name == "data-text"
+							method = "textContent"
+							iv = "ent.encode(#{iv});"
+
 						statement.variableDealer = @manageVariableDealer
 						@manageClass += """
 #{@name}.prototype.#{fname} = function(){
 	var self = this;
 	var s = #{statement.toJS()};
-	this.el#{@clsCounter}.innerHTML = s;
+	this.el#{@clsCounter}.#{method} = s;
 };
 
 """
@@ -177,7 +183,7 @@ var fa = [];
 for(var an in attrs){
 	var av = attrs[an];
 	if(an == "class"){ av = av.join(" "); }
-	fa.push( an + '="' + av + '"');
+	fa.push( an + '="' + ent.encode(av) + '"');
 }
 o += fa.join(" ") + ">";\n
 """
@@ -291,8 +297,8 @@ var #{@name} = function(element) {
 		console.log "#{k*1+1}: #{line}" for k, line of bf.toString().split("\n")
 
 
-		console.log "--------"
-		console.log bf()
+		#console.log "--------"
+		#console.log bf()
 		console.log "--------"
 		console.log @manageClass
 		console.log "--------"

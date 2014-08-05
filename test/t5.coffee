@@ -1,12 +1,13 @@
 assert = require("assert")
 t5 = require("../lib/T5.coffee")
 jsdom = require("jsdom")
+ent = require "ent"
 
 compile = (tpl, cb) ->
 	tpl = t5.compile(tpl)
 	jsdom.env
-		html: tpl.build()(),
-		scripts : [ "../node_modules/js-base64/base64.js" ]
+		html: tpl.build()(ent),
+		scripts : [ "../node_modules/js-base64/base64.js", "../gen/ent.js" ]
 		src : ["""
 // This is because atob and btoa are strangely not available
 window.btoa = function(i){

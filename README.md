@@ -26,7 +26,9 @@ More soon haha, this is currently very WIP
 ## Building
 
 This requires gulp and running `npm install`, but the default gulp task
-builds everything required
+builds everything required. BUT thanks to browserify, you need to use
+
+	./build.sh
 
 ## Tests
 
