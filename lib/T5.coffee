@@ -23,6 +23,9 @@ var __getvar = function(v){
 		@manageItems = {}
 		@manageClassConstructor = ""
 
+	build : ->
+		return new Function( @buildFunction )
+
 	variableDealer : (varname) ->
 		return """
 __getvar("#{varname}")
@@ -43,7 +46,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 		# Do Attributes
 		if node.attrs
 			for attr in node.attrs
-				console.log attr
+				#console.log attr
 				switch attr.name
 					when "class"
 						bf += """attrs["class"].push("#{attr.value}");"""
@@ -59,6 +62,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 						statement.variableDealer = @variableDealer
 						bf += """if(!(#{statement.toJS()})){ attrs["style"] = "display: none"; }\n"""
 						statement.variableDealer = @manageVariableDealer
+
 						for v in statement.vars()
 							if !@manageItems[v]
 								@manageItems[v] = []
@@ -71,7 +75,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 	if(!(#{statement.toJS()})){
 		s = 'display: none';
 	}
-	this.el#{@clsCounter}.style = s;
+	this.el#{@clsCounter}.style.display = s;
 };
 
 """
@@ -84,8 +88,15 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 						bf += """attrs["#{attr.name}"] = "#{attr.value}";""";
 
 		if cEl
-			@manageClassConstructor += """
+			if node.parentNode.nodeName == "#document-fragment" # Top-level element
+				@manageClassConstructor += """
+this.el#{@clsCounter} = this.element;
+
+"""
+			else
+				@manageClassConstructor += """
 this.el#{@clsCounter} = this.element.getElementsByClassName("t5-#{@clsCounter}");
+
 """
 
 		if node.nodeName.charAt(0) != "#" ## TODO: MAKE THIS SAFER
@@ -100,7 +111,7 @@ for(var an in attrs){
 o += fa.join(" ") + ">";
 """
 		else
-			console.log node
+			#console.log node
 			switch node.nodeName
 				when "#text"
 					bf += """o += #{JSON.stringify(node.value)};"""
@@ -149,6 +160,7 @@ if(#{lc.v}){
 		# Setup watcher things
 		for k, watching of @manageItems
 			# TOOD: deal with object.this.that
+			console.log k, watching
 			@manageClassConstructor += """
 Object.defineProperty(this, "#{k}", {
 	get : function(){
@@ -163,7 +175,7 @@ Object.defineProperty(this, "#{k}", {
 """
 		@manageClass = """
 // THIS CLASS IS AUTOMATICALLY GENERATED
-function #{@name}(element) {
+var #{@name} = function(element) {
 	this.element = element;
 	var self = this;
 #{@manageClassConstructor}
@@ -185,4 +197,5 @@ function #{@name}(element) {
 
 @compile = (str) ->
 	p = new T5()
-	return p.compile(str)
+	p.compile(str)
+	return p

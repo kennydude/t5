@@ -68,7 +68,7 @@ class LogicalStatement
 		traverse(@res).map (item) ->
 			if item == null #skip
 			else if item.type == "var"
-				vars.push item.value
+				vars.push( item.value )
 
 		return vars
 

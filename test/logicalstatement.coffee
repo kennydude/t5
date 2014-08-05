@@ -7,6 +7,11 @@ describe 'LogicalStatement', () ->
 		assert.deepEqual statement.variables(), ["bob", "john"]
 		assert.equal statement.toJS(), "bob == john"
 
+	it 'should parse bob correctly', () ->
+		statement = new ls("bob")
+		assert.deepEqual statement.variables(), ["bob"]
+		assert.equal statement.toJS(), "bob == true"
+
 	it 'should parse bob > john correctly', () ->
 		statement = new ls("bob > john")
 		assert.deepEqual statement.variables(), ["bob", "john"]
