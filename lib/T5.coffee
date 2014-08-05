@@ -3,6 +3,7 @@ T5 is a template engine for NodeJS
 '''
 parse5 = require("parse5")
 ls = require("./LogicalStatement")
+cs = require("./ConcatStatement")
 
 class T5Context
 	constructor : () ->
@@ -18,7 +19,14 @@ var attrs;
 var __getvar = function(v){
 	v = v.split(".");
 	// todo
+	return "todo{return value}";
 };
+if (typeof process !== 'undefined' && process.title == "node") {
+	// NodeJS is supported!
+	var btoa = function(i){
+		return new Buffer(i).toString("base64");
+	};
+}
 
 """
 		@clsCounter = 0
@@ -90,6 +98,9 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 					when "data-if"
 						## TODO: MAKE THIS WORK IT DOES NOT WORK RIGHT NOW
 						## I need to figure out a way to dynamically add/remove this stuff
+
+						## Maybe need another expression parser if we want more
+						## advanced stuff
 						statement = new ls( attr.value )
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
@@ -107,12 +118,11 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 	var self = this;
 	var element;
 	if(#{statement.toJS()}){
-		// TODO: Something here
 		element = this.el#{@clsCounter}_pristine;
 	} else{
 		element = document.createComment("[t5-hidden]");
 	}
-	
+
 	this.el#{@clsCounter}.parentNode.replaceChild( element, this.el#{@clsCounter} );
 	this.el#{@clsCounter} = element;
 };
@@ -121,7 +131,29 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 
 						cEl = true
 					when "data-html"
+						statement = new cs( attr.value )
+						statement.variableDealer = @variableDealer
+						iv = statement.toJS()
 
+						fname = "_inTPL#{@clsCounter}_html"
+						for v in statement.vars()
+							if !@manageItems[v]
+								@manageItems[v] = []
+							@manageItems[v].push(fname)
+
+						statement.variableDealer = @manageVariableDealer
+						@manageClass += """
+#{@name}.prototype.#{fname} = function(){
+	var self = this;
+	var s = #{statement.toJS()};
+	this.el#{@clsCounter}.innerHTML = s;
+};
+
+"""
+
+						lc = { "t": "html", "v" : """
+o += #{iv};
+""" }
 						cEl = true
 					else
 						bf += """attrs["#{attr.name}"] = "#{attr.value}";""";
@@ -159,6 +191,8 @@ o += fa.join(" ") + ">";\n
 
 		if lc != null
 			switch lc.t
+				when "html"
+					bf += lc.v
 				when "if"
 					oldContext = @cntxt
 					@cntxt = new T5Context()
@@ -167,8 +201,17 @@ o += fa.join(" ") + ">";\n
 if(#{lc.mv}){
 	this.el#{@clsCounter}_pristine = this.el#{@clsCounter};
 } else{
-	this.el#{@clsCounter}_pristine = document.createElement("#{node.nodeName}");
-	this.el#{@clsCounter}_pristine.innerHTML = "demo";
+	//this.el#{@clsCounter}_pristine = document.createElement("#{node.nodeName}");
+
+	var elx = this.el#{@clsCounter}.childNodes[0].nodeValue.trim();
+	if(elx.substr(0,3) != "[t5]"){
+		console.warn("T5W: Comment is not valid!");
+	}
+	elx = atob(elx.substr(5));
+
+	var el = document.createElement("div");
+	el.innerHTML = elx;
+	this.el#{@clsCounter}_pristine = el.childNodes[0];
 }\n
 """
 					bf = """
@@ -177,6 +220,8 @@ if(#{lc.v}){
 } else{
 	o += "<span class=\\"t5-#{@clsCounter}\\"><!-- [t5] ";
 	var to = o;
+	o = "";
+	#{bf}
 }\n
 """
 
@@ -201,8 +246,10 @@ o += "</#{node.nodeName}>";\n
 if(#{lc.v}){
 	#{bf}
 } else{
+	#{bf}
+	var x = btoa(o);
 	o = to;
-	o += "--\></span>";
+	o += x + " --\></span>";
 }\n
 """
 			@buildFunction += bf
@@ -240,9 +287,10 @@ var #{@name} = function(element) {
 #{@manageClass}
 """
 
-		console.log @buildFunction
-
 		bf = new Function(@buildFunction)
+		console.log "#{k*1+1}: #{line}" for k, line of bf.toString().split("\n")
+
+
 		console.log "--------"
 		console.log bf()
 		console.log "--------"

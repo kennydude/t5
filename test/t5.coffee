@@ -6,7 +6,16 @@ compile = (tpl, cb) ->
 	tpl = t5.compile(tpl)
 	jsdom.env
 		html: tpl.build()(),
+		scripts : [ "../node_modules/js-base64/base64.js" ]
 		src : ["""
+// This is because atob and btoa are strangely not available
+window.btoa = function(i){
+	return Base64.encode(i);
+};
+window.atob = function(i){
+	return Base64.decode(i);
+}
+
 #{tpl.manageClass}
 
 window.template = new TPL(document.getElementsByTagName("div")[0]);
@@ -19,11 +28,12 @@ window.template = new TPL(document.getElementsByTagName("div")[0]);
 			cb window.template, el
 
 describe 'T5', () ->
-	it 'simple data-show', () ->
+	it 'simple data-show', (done) ->
 		cb = (manage, el) ->
 			assert.equal el.getAttribute("style"), "display: none"
 			manage.myitem = true
 			assert.equal el.getAttribute("style"), ""
+			done()
 
 		compile("""
 <div data-show="myitem" class="egg">
@@ -31,15 +41,18 @@ describe 'T5', () ->
 </div>
 """, cb)
 
-	it 'simple data-if', () ->
+	it 'simple data-if', (done) ->
 		cb = (manage, el) ->
 			console.log el.outerHTML
 			manage.myitem = true
+			manage.myvalue = "THIs is my value"
 			console.log el.outerHTML
 			manage.myitem = false
+			manage.myvalue = "xOOXO"
 			console.log el.outerHTML
 			manage.myitem = true
 			console.log el.outerHTML
+			done()
 
 		compile("""
 <div class="something important lmfao">

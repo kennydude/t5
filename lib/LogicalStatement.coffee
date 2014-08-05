@@ -14,7 +14,7 @@ y < y
 o <= y
 u >= e
 '''
-parser = require "../peg/LogicalStatement.js"
+Lparser = require "../peg/LogicalStatement.js"
 traverse = require "traverse"
 
 class LogicalStatement
@@ -22,7 +22,10 @@ class LogicalStatement
 		@variableDealer = (varname) ->
 			return varname # Direct but this can be changed!
 
-		@res = parser.parse statement
+		@res = @getParser().parse statement
+
+	getParser : () ->
+		return Lparser
 
 	javascript : () ->
 		return @toJavascript()
@@ -49,6 +52,8 @@ class LogicalStatement
 						o += " || "
 					when "equals"
 						o += " == "
+					when "add"
+						o += " + "
 					when "literal"
 						o += JSON.stringify(item.value)
 					when "int"

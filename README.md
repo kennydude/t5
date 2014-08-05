@@ -23,6 +23,11 @@ when this has reached a point where it is stable enough to do so.
 
 More soon haha, this is currently very WIP
 
+## Building
+
+This requires gulp and running `npm install`, but the default gulp task
+builds everything required
+
 ## Tests
 
 You should have Mocha installed, but we use CoffeeScript, so run
