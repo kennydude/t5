@@ -4,27 +4,48 @@ jsdom = require("jsdom")
 
 compile = (tpl, cb) ->
 	tpl = t5.compile(tpl)
-	jsdom.env(
-		tpl.build()(),
-	(errors, window) ->
-		console.log "done building"
-		manage = (new Function """
+	jsdom.env
+		html: tpl.build()(),
+		src : ["""
 #{tpl.manageClass}
-return TPL;
-""")()
-		cb new manage( window.document.getElementsByTagName("div")[0] ), window
-	)
+
+window.template = new TPL(document.getElementsByTagName("div")[0]);
+"""]
+		done: (errors, window) ->
+			if errors
+				console.log "Errors while using jsdom: ", errors
+				throw new Error("JSDom didn't work")
+			el = window.document.getElementsByTagName("div")[0]
+			cb window.template, el
 
 describe 'T5', () ->
 	it 'simple data-show', () ->
-		cb = (manage, window) ->
-			console.log window.document.outerHTML
-
+		cb = (manage, el) ->
+			assert.equal el.getAttribute("style"), "display: none"
 			manage.myitem = true
+			assert.equal el.getAttribute("style"), ""
 
-			console.log window.document.outerHTML
 		compile("""
 <div data-show="myitem" class="egg">
 	IK <!-- ok -->
+</div>
+""", cb)
+
+	it 'simple data-if', () ->
+		cb = (manage, el) ->
+			console.log el.outerHTML
+			manage.myitem = true
+			console.log el.outerHTML
+			manage.myitem = false
+			console.log el.outerHTML
+			manage.myitem = true
+			console.log el.outerHTML
+
+		compile("""
+<div class="something important lmfao">
+	<div data-if="myitem" class="egg">
+		IK <!-- ok -->
+		<span data-html="myvalue"></span>
+	</div>
 </div>
 """, cb)

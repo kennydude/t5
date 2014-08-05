@@ -4,6 +4,10 @@ T5 is a template engine for NodeJS
 parse5 = require("parse5")
 ls = require("./LogicalStatement")
 
+class T5Context
+	constructor : () ->
+		@element = "this.element"
+
 class T5
 	constructor : (@name) ->
 		@name = @name || "TPL"
@@ -22,6 +26,7 @@ var __getvar = function(v){
 """
 		@manageItems = {}
 		@manageClassConstructor = ""
+		@cntxt = new T5Context()
 
 	build : ->
 		return new Function( @buildFunction )
@@ -38,10 +43,11 @@ self.#{varname}
 	doNodes : (node) ->
 		bf = """
 attrs = {};
-attrs["class"] = ["t5-#{@clsCounter}"];
+attrs["class"] = ["t5-#{@clsCounter}"];\n
 """
-		lc = null
+		lc = null # holding place for extra actions
 		cEl = false
+		oldContext = null
 
 		# Do Attributes
 		if node.attrs
@@ -49,13 +55,13 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 				#console.log attr
 				switch attr.name
 					when "class"
-						bf += """attrs["class"].push("#{attr.value}");"""
+						bf += """attrs["class"].push("#{attr.value}");\n"""
 					when "data-class"
 						l = attrs.value.split "\n"
 						for line in l
 							if line.trim() != ""
 								p = line.split(":", 2)
-								bf += """if(#{p[1]}){ attrs["class"].push("#{p[0]}")  }"""
+								bf += """if(#{p[1]}){ attrs["class"].push("#{p[0]}")  }\n"""
 						cEl = true
 					when "data-show"
 						statement = new ls( attr.value )
@@ -63,12 +69,13 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 						bf += """if(!(#{statement.toJS()})){ attrs["style"] = "display: none"; }\n"""
 						statement.variableDealer = @manageVariableDealer
 
+						fname = "_inTPL#{@clsCounter}_show"
 						for v in statement.vars()
 							if !@manageItems[v]
 								@manageItems[v] = []
-							fname = "_inTPL#{@clsCounter}_show"
 							@manageItems[v].push(fname)
-							@manageClass += """
+
+						@manageClass += """
 #{@name}.prototype.#{fname} = function(){
 	var self = this;
 	var s = '';
@@ -83,19 +90,51 @@ attrs["class"] = ["t5-#{@clsCounter}"];
 					when "data-if"
 						## TODO: MAKE THIS WORK IT DOES NOT WORK RIGHT NOW
 						## I need to figure out a way to dynamically add/remove this stuff
-						lc = { "t" : "if", "v" : attr.value }
+						statement = new ls( attr.value )
+						statement.variableDealer = @variableDealer
+						iv = statement.toJS()
+						statement.variableDealer = @manageVariableDealer
+
+						lc = { "t" : "if", "v" : iv, "mv" : statement.toJS() }
+
+						fname = "_inTPL#{@clsCounter}_if"
+						if !@manageItems[attr.value]
+							@manageItems[attr.value] = []
+						@manageItems[attr.value].push(fname)
+
+						@manageClass += """
+#{@name}.prototype.#{fname} = function(){
+	var self = this;
+	var element;
+	if(#{statement.toJS()}){
+		// TODO: Something here
+		element = this.el#{@clsCounter}_pristine;
+	} else{
+		element = document.createComment("[t5-hidden]");
+	}
+	
+	this.el#{@clsCounter}.parentNode.replaceChild( element, this.el#{@clsCounter} );
+	this.el#{@clsCounter} = element;
+};
+
+"""
+
+						cEl = true
+					when "data-html"
+
+						cEl = true
 					else
 						bf += """attrs["#{attr.name}"] = "#{attr.value}";""";
 
 		if cEl
 			if node.parentNode.nodeName == "#document-fragment" # Top-level element
 				@manageClassConstructor += """
-this.el#{@clsCounter} = this.element;
+this.el#{@clsCounter} = #{@cntxt.element};
 
 """
 			else
 				@manageClassConstructor += """
-this.el#{@clsCounter} = this.element.getElementsByClassName("t5-#{@clsCounter}");
+this.el#{@clsCounter} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCounter}")[0];
 
 """
 
@@ -108,23 +147,37 @@ for(var an in attrs){
 	if(an == "class"){ av = av.join(" "); }
 	fa.push( an + '="' + av + '"');
 }
-o += fa.join(" ") + ">";
+o += fa.join(" ") + ">";\n
 """
 		else
 			#console.log node
 			switch node.nodeName
 				when "#text"
-					bf += """o += #{JSON.stringify(node.value)};"""
+					bf = """o += #{JSON.stringify(node.value)};\n"""
 				when "#comment"
-					bf += """o += "<!-- #{node.data} -->";"""
+					bf = """o += "<!-- #{node.data} -->";\n"""
 
-		if lc != null ## TODO
-			bf = """
+		if lc != null
+			switch lc.t
+				when "if"
+					oldContext = @cntxt
+					@cntxt = new T5Context()
+					@cntxt.element = "this.el#{@clsCounter}_pristine"
+					@manageClassConstructor += """
+if(#{lc.mv}){
+	this.el#{@clsCounter}_pristine = this.el#{@clsCounter};
+} else{
+	this.el#{@clsCounter}_pristine = document.createElement("#{node.nodeName}");
+	this.el#{@clsCounter}_pristine.innerHTML = "demo";
+}\n
+"""
+					bf = """
 if(#{lc.v}){
 	#{bf}
 } else{
-	o += "<span class=\\"t5-#{@clsCounter}\\"><!-- [t5]: ";
-}
+	o += "<span class=\\"t5-#{@clsCounter}\\"><!-- [t5] ";
+	var to = o;
+}\n
 """
 
 		@buildFunction += bf
@@ -138,15 +191,19 @@ if(#{lc.v}){
 		# End build function
 		if node.nodeName.charAt(0) != "#"
 			bf = """
-o += "</#{node.nodeName}>";
+o += "</#{node.nodeName}>";\n
 """
 			if lc != null ## TODO
-				bf = """
+				switch lc.t
+					when "if"
+						@cntxt = oldContext
+						bf = """
 if(#{lc.v}){
 	#{bf}
 } else{
-	o += " [/t5] --></span>";
-}
+	o = to;
+	o += "--\></span>";
+}\n
 """
 			@buildFunction += bf
 
@@ -188,12 +245,9 @@ var #{@name} = function(element) {
 		bf = new Function(@buildFunction)
 		console.log "--------"
 		console.log bf()
-
 		console.log "--------"
 		console.log @manageClass
-
-		s = new parse5.TreeSerializer()
-		console.log s.serialize( doc )
+		console.log "--------"
 
 @compile = (str) ->
 	p = new T5()
