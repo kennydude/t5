@@ -9,7 +9,17 @@ Typically you do this:
 But this only works in one place and it doesn't work well when you want to dynamically
 change the template but not rewrite the DOM (spoiling any CSS effects etc)
 
-T5 works by pre-compiling everything.
+T5 works by producing two outputs:
+
+* Rendering function to do the traditional data+template=>output
+* Management class to alter the result dynamically without causing havoc to the
+  DOM
+
+This means that if you do not use XML/HTML or the DOM, this is pretty useless
+and you shouldn't use it.
+
+This will be used in [WhatTheForms](http://github.com/kennydude/whattheforms)
+when this has reached a point where it is stable enough to do so.
 
 More soon haha, this is currently very WIP
 
