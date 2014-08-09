@@ -19,7 +19,7 @@ window.atob = function(i){
 
 #{tpl.manageClass}
 
-window.template = new TPL(document.getElementsByTagName("div")[0]);
+window.template = new TPL(document.getElementsByTagName("div")[0], #{JSON.stringify(data)});
 """]
 		done: (errors, window) ->
 			if errors
@@ -68,6 +68,18 @@ describe 'T5', () ->
 	it 'simple data-repeat', (done) ->
 		cb = (manage, el) ->
 			console.log el.outerHTML
+			x = { myvalue : "Test item 3" }
+			manage.myitem.push(x)
+			console.log el.outerHTML
+
+			manage.myitem[ 0 ].myvalue = "<bold>hi</bold>"
+			manage.myitem[ manage.myitem.length - 1 ].myvalue = "xxx"
+
+			console.log el.outerHTML
+
+			manage.myitem[ 1 ].myvalue = "looooool"
+
+			console.log el.outerHTML
 			done()
 
 		d = {
@@ -78,11 +90,12 @@ describe 'T5', () ->
 		}
 
 		compile("""
-	<div class="something important lmfao">
+<div class="something important lmfao">
 	<div data-repeat="myitem" class="egg">
 		IK <!-- ok -->
 			<span data-text="myvalue"></span>
 		<span data-html="myvalue"></span>
 	</div>
-	</div>
+	<div id="debug"></div>
+</div>
 """, cb, d)

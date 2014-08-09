@@ -16,18 +16,7 @@ class T5Context
 class T5
 	constructor : (@name) ->
 		@name = @name || "TPL"
-		@manageClassTPL = """
-this.element = element;
-if(!element) throw new Error("An element is required to attach the management class");
-var self = this;
-
-data = data || {};
-for(var k in data){ // Copy values into this class
-	self[k] = data[k];
-}
-"""
-		@buildFunction = """
-// THIS FUNCTION IS AUTOMATICALLY GENERATED
+		@buildFunctionTPL = """
 data = data || {};
 var context = data;
 var stack = [];
@@ -37,10 +26,8 @@ var __getvar = function(v){
 	v = v.split(".");
 	r = context;
 	for(var i in v){
-		console.log(v[i]);
 		r = r[v[i]];
 	}
-	console.log("__getvar:", v, r);
 	return r;
 };
 if (typeof process !== 'undefined' && process.title == "node") {
@@ -50,6 +37,20 @@ if (typeof process !== 'undefined' && process.title == "node") {
 	};
 }
 
+"""
+		@manageClassTPL = """
+this.element = element;
+if(!element) throw new Error("An element is required to attach the management class");
+var self = this;
+
+data = data || {};
+for(var k in data){ // Copy values into this class
+	self["_" + k] = data[k];
+}
+"""
+		@buildFunction = """
+// THIS FUNCTION IS AUTOMATICALLY GENERATED
+#{@buildFunctionTPL}
 """
 		@clsCounter = 0
 		@manageClass = """
@@ -68,7 +69,7 @@ __getvar("#{varname}")
 """
 	manageVariableDealer : (varname) ->
 		return """
-self.#{varname}
+self._#{varname}
 """
 
 	doNodes : (node) ->
@@ -153,15 +154,37 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 						statement = new cs( attr.value ) # TODO: Single Var Processor
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
+						statement.variableDealer = @manageVariableDealer
 
+						@manageClassConstructor += """
+this.#{attr.value} = [];
+var els = self.element.getElementsByClassName("t5-#{@clsCounter}");
+for(var k in #{statement.toJS()}){
+	this.#{attr.value}.push( new #{@name}_sub#{@clsCounter}(els[k], #{statement.toJS()}[k]) );
+}
+this.#{attr.value}.push = function(item){
+	// add a new item
+	var el = document.createElement("div");
+	el.innerHTML = #{@name}_sub#{@clsCounter}.buildFunction(ent, item);
+	var elm = el.childNodes[0];
+	var els = self.element.getElementsByClassName("t5-#{@clsCounter}");
+	el = els[ els.length - 1 ];
+	el.parentNode.insertBefore( elm, el.nextSibling );
+
+	var ni = new #{@name}_sub#{@clsCounter}(elm, item);
+
+	return Array.prototype.push.apply(this, [ ni ]);
+};\n
+"""
 						bf = """
 // data-repeat
 for(var k in #{iv}) {
 stack.push(context);
 context = #{iv}[k];
+// end-data-repeat
 #{bf}
 """
-
+						#cEl = true
 						lc = { "t" : "repeat" }
 
 					when "data-html", "data-text"
@@ -285,7 +308,7 @@ if(#{lc.v}){
 
 		if lc != null
 			if lc.t == "repeat"
-				@cntxt.buildFunction = ""
+				@cntxt.buildFunction = @cntxt.buildFunction.substr( @cntxt.buildFunction.indexOf("// end-data-repeat") )
 
 		@clsCounter += 1
 		if node.childNodes
@@ -311,13 +334,17 @@ o += "</#{node.nodeName}>";\n
 var #{@cntxt.name} = function(element, data) {
 	#{@manageClassTPL}
 
-	this.buildFunction = function(data){
-		#{@cntxt.buildFunction}
-		#{bf}
-	}
-
 	#{@manageClassConstructor}
 }
+#{@cntxt.name}.buildFunction = function(ent, data){
+	#{@buildFunctionTPL}
+
+	#{@cntxt.buildFunction}
+	#{bf}
+
+	return o;
+}
+
 
 #{mcl}
 """
