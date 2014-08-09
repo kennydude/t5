@@ -9,18 +9,39 @@ ent = require "ent"
 class T5Context
 	constructor : () ->
 		@element = "this.element"
+		@name = "TPL"
+		@manageItems = {}
+		@buildFunction = ""
 
 class T5
 	constructor : (@name) ->
 		@name = @name || "TPL"
+		@manageClassTPL = """
+this.element = element;
+if(!element) throw new Error("An element is required to attach the management class");
+var self = this;
+
+data = data || {};
+for(var k in data){ // Copy values into this class
+	self[k] = data[k];
+}
+"""
 		@buildFunction = """
 // THIS FUNCTION IS AUTOMATICALLY GENERATED
+data = data || {};
+var context = data;
+var stack = [];
 var o = "";
 var attrs;
 var __getvar = function(v){
 	v = v.split(".");
-	// todo
-	return "todo{return value}";
+	r = context;
+	for(var i in v){
+		console.log(v[i]);
+		r = r[v[i]];
+	}
+	console.log("__getvar:", v, r);
+	return r;
 };
 if (typeof process !== 'undefined' && process.title == "node") {
 	// NodeJS is supported!
@@ -33,12 +54,13 @@ if (typeof process !== 'undefined' && process.title == "node") {
 		@clsCounter = 0
 		@manageClass = """
 """
-		@manageItems = {}
 		@manageClassConstructor = ""
 		@cntxt = new T5Context()
+		@cntxt.name = @name
+		@stack = []
 
 	build : ->
-		return new Function( "ent", @buildFunction )
+		return new Function( "ent", "data", @buildFunction )
 
 	variableDealer : (varname) ->
 		return """
@@ -56,7 +78,6 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 """
 		lc = null # holding place for extra actions
 		cEl = false
-		oldContext = null
 
 		# Do Attributes
 		if node.attrs
@@ -80,12 +101,12 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 
 						fname = "_inTPL#{@clsCounter}_show"
 						for v in statement.vars()
-							if !@manageItems[v]
-								@manageItems[v] = []
-							@manageItems[v].push(fname)
+							if !@cntxt.manageItems[v]
+								@cntxt.manageItems[v] = []
+							@cntxt.manageItems[v].push(fname)
 
 						@manageClass += """
-#{@name}.prototype.#{fname} = function(){
+#{@cntxt.name}.prototype.#{fname} = function(){
 	var self = this;
 	var s = '';
 	if(!(#{statement.toJS()})){
@@ -97,10 +118,6 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 """
 						cEl = true
 					when "data-if"
-						## TODO: MAKE THIS WORK IT DOES NOT WORK RIGHT NOW
-						## I need to figure out a way to dynamically add/remove this stuff
-
-						## Maybe need another expression parser if we want more
 						## advanced stuff
 						statement = new ls( attr.value )
 						statement.variableDealer = @variableDealer
@@ -110,12 +127,12 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 						lc = { "t" : "if", "v" : iv, "mv" : statement.toJS() }
 
 						fname = "_inTPL#{@clsCounter}_if"
-						if !@manageItems[attr.value]
-							@manageItems[attr.value] = []
-						@manageItems[attr.value].push(fname)
+						if !@cntxt.manageItems[attr.value]
+							@cntxt.manageItems[attr.value] = []
+						@cntxt.manageItems[attr.value].push(fname)
 
 						@manageClass += """
-#{@name}.prototype.#{fname} = function(){
+#{@cntxt.name}.prototype.#{fname} = function(){
 	var self = this;
 	var element;
 	if(#{statement.toJS()}){
@@ -131,25 +148,43 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 """
 
 						cEl = true
+					when "data-repeat"
+						console.warn("Experimental data-repeat support!!!!")
+						statement = new cs( attr.value ) # TODO: Single Var Processor
+						statement.variableDealer = @variableDealer
+						iv = statement.toJS()
+
+						bf = """
+// data-repeat
+for(var k in #{iv}) {
+stack.push(context);
+context = #{iv}[k];
+#{bf}
+"""
+
+						lc = { "t" : "repeat" }
+
 					when "data-html", "data-text"
 						statement = new cs( attr.value )
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
 
 						fname = "_inTPL#{@clsCounter}_html"
-						for v in statement.vars()
-							if !@manageItems[v]
-								@manageItems[v] = []
-							@manageItems[v].push(fname)
 
 						method = "innerHTML"
 						if attr.name == "data-text"
 							method = "textContent"
-							iv = "ent.encode(#{iv});"
+							iv = "ent.encode(#{iv} + \"\");"
+							fname = "_inTPL#{@clsCounter}_text"
+
+						for v in statement.vars()
+							if !@cntxt.manageItems[v]
+								@cntxt.manageItems[v] = []
+							@cntxt.manageItems[v].push(fname)
 
 						statement.variableDealer = @manageVariableDealer
 						@manageClass += """
-#{@name}.prototype.#{fname} = function(){
+#{@cntxt.name}.prototype.#{fname} = function(){
 	var self = this;
 	var s = #{statement.toJS()};
 	this.el#{@clsCounter}.#{method} = s;
@@ -183,13 +218,15 @@ var fa = [];
 for(var an in attrs){
 	var av = attrs[an];
 	if(an == "class"){ av = av.join(" "); }
-	fa.push( an + '="' + ent.encode(av) + '"');
+	fa.push( an + '="' + ent.encode(av+"") + '"');
 }
 o += fa.join(" ") + ">";\n
 """
 		else
 			#console.log node
 			switch node.nodeName
+				when "#document-fragment"
+					bf = ""
 				when "#text"
 					bf = """o += #{JSON.stringify(node.value)};\n"""
 				when "#comment"
@@ -197,18 +234,30 @@ o += fa.join(" ") + ">";\n
 
 		if lc != null
 			switch lc.t
+				when "repeat"
+					@stack.push @cntxt
+					ele = @cntxt.element
+					@cntxt = new T5Context()
+					@cntxt.element = ele
+					@cntxt.name = "#{@name}_sub#{@clsCounter}"
+
+					@stack.push @manageClassConstructor
+					@manageClassConstructor = ""
+
+					@stack.push @manageClass
+					@manageClass = ""
+
 				when "html"
 					bf += lc.v
 				when "if"
-					oldContext = @cntxt
+					@stack.push @cntxt
 					@cntxt = new T5Context()
+					@cntxt.name = @name
 					@cntxt.element = "this.el#{@clsCounter}_pristine"
 					@manageClassConstructor += """
 if(#{lc.mv}){
 	this.el#{@clsCounter}_pristine = this.el#{@clsCounter};
 } else{
-	//this.el#{@clsCounter}_pristine = document.createElement("#{node.nodeName}");
-
 	var elx = this.el#{@clsCounter}.childNodes[0].nodeValue.trim();
 	if(elx.substr(0,3) != "[t5]"){
 		console.warn("T5W: Comment is not valid!");
@@ -232,6 +281,11 @@ if(#{lc.v}){
 """
 
 		@buildFunction += bf
+		@cntxt.buildFunction += bf
+
+		if lc != null
+			if lc.t == "repeat"
+				@cntxt.buildFunction = ""
 
 		@clsCounter += 1
 		if node.childNodes
@@ -246,8 +300,36 @@ o += "</#{node.nodeName}>";\n
 """
 			if lc != null ## TODO
 				switch lc.t
+					when "repeat"
+						mcl = @manageClass
+						@manageClass = @stack.pop()
+
+						@doManageItems()
+
+						@manageClass += """
+// THIS CLASS IS AUTOMATICALLY GENERATED
+var #{@cntxt.name} = function(element, data) {
+	#{@manageClassTPL}
+
+	this.buildFunction = function(data){
+		#{@cntxt.buildFunction}
+		#{bf}
+	}
+
+	#{@manageClassConstructor}
+}
+
+#{mcl}
+"""
+						bf += """
+context = stack.pop();
+}\n
+"""
+						@manageClassConstructor = @stack.pop()
+						@cntxt = @stack.pop()
+
 					when "if"
-						@cntxt = oldContext
+						@cntxt = @stack.pop()
 						bf = """
 if(#{lc.v}){
 	#{bf}
@@ -258,17 +340,12 @@ if(#{lc.v}){
 	o += x + " --\></span>";
 }\n
 """
+			@cntxt.buildFunction += bf
 			@buildFunction += bf
 
-	compile : (str) ->
-		parser = new parse5.Parser()
-		doc = parser.parseFragment str
-
-		@doNodes(doc)
-		@buildFunction += "return o;"
-
+	doManageItems : () ->
 		# Setup watcher things
-		for k, watching of @manageItems
+		for k, watching of @cntxt.manageItems
 			# TOOD: deal with object.this.that
 			console.log k, watching
 			@manageClassConstructor += """
@@ -278,23 +355,33 @@ Object.defineProperty(this, "#{k}", {
 	},
 	set : function(v){
 		self._#{k} = v;
-		#{"self.#{v}();" for v in watching}
+		#{("self.#{v}();\n" for v in watching).join("")}
 	}
 });
 
 """
+
+	compile : (str) ->
+		parser = new parse5.Parser()
+		doc = parser.parseFragment str
+
+		@doNodes(doc)
+		@buildFunction += "return o;"
+
+		@doManageItems()
+
 		@manageClass = """
 // THIS CLASS IS AUTOMATICALLY GENERATED
-var #{@name} = function(element) {
-	this.element = element;
-	var self = this;
+var #{@cntxt.name} = function(element, data) {
+	#{@manageClassTPL}
+
 #{@manageClassConstructor}
 }
 #{@manageClass}
 """
 
-		bf = new Function(@buildFunction)
-		console.log "#{k*1+1}: #{line}" for k, line of bf.toString().split("\n")
+		#bf = new Function(@buildFunction)
+		console.log "#{k*1+1}: #{line}" for k, line of @buildFunction.toString().split("\n")
 
 
 		#console.log "--------"

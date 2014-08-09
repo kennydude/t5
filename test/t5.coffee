@@ -3,10 +3,10 @@ t5 = require("../lib/T5.coffee")
 jsdom = require("jsdom")
 ent = require "ent"
 
-compile = (tpl, cb) ->
+compile = (tpl, cb, data) ->
 	tpl = t5.compile(tpl)
 	jsdom.env
-		html: tpl.build()(ent),
+		html: tpl.build()(ent, data),
 		scripts : [ "../node_modules/js-base64/base64.js", "../gen/ent.js" ]
 		src : ["""
 // This is because atob and btoa are strangely not available
@@ -49,7 +49,7 @@ describe 'T5', () ->
 			manage.myvalue = "THIs is my value"
 			console.log el.outerHTML
 			manage.myitem = false
-			manage.myvalue = "xOOXO"
+			manage.myvalue = "xO<bold>OXO</bold>"
 			console.log el.outerHTML
 			manage.myitem = true
 			console.log el.outerHTML
@@ -59,7 +59,30 @@ describe 'T5', () ->
 <div class="something important lmfao">
 	<div data-if="myitem" class="egg">
 		IK <!-- ok -->
+			<span data-text="myvalue"></span>
 		<span data-html="myvalue"></span>
 	</div>
 </div>
 """, cb)
+
+	it 'simple data-repeat', (done) ->
+		cb = (manage, el) ->
+			console.log el.outerHTML
+			done()
+
+		d = {
+			myitem : [
+				{myvalue : "TEST ITEM"},
+				{myvalue : "TEST ITEM 2"}
+			]
+		}
+
+		compile("""
+	<div class="something important lmfao">
+	<div data-repeat="myitem" class="egg">
+		IK <!-- ok -->
+			<span data-text="myvalue"></span>
+		<span data-html="myvalue"></span>
+	</div>
+	</div>
+""", cb, d)
