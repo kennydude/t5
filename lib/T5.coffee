@@ -2,8 +2,13 @@
 T5 is a template engine for NodeJS
 '''
 parse5 = require("parse5")
-ls = require("./LogicalStatement")
-cs = require("./ConcatStatement")
+#include("./LogicalStatement.coffee")
+#include("./ConcatStatement.coffee")
+
+# @exclude
+LogicalStatement = require("./LogicalStatement")
+ConcatStatement = require("./ConcatStatement")
+# @endexclude
 ent = require "ent"
 
 class T5Context
@@ -60,9 +65,6 @@ for(var k in data){ // Copy values into this class
 		@cntxt.name = @name
 		@stack = []
 
-	build : ->
-		return new Function( "ent", "data", @buildFunction )
-
 	variableDealer : (varname) ->
 		return """
 __getvar("#{varname}")
@@ -95,7 +97,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 								bf += """if(#{p[1]}){ attrs["class"].push("#{p[0]}")  }\n"""
 						cEl = true
 					when "data-show"
-						statement = new ls( attr.value )
+						statement = new LogicalStatement( attr.value )
 						statement.variableDealer = @variableDealer
 						bf += """if(!(#{statement.toJS()})){ attrs["style"] = "display: none"; }\n"""
 						statement.variableDealer = @manageVariableDealer
@@ -120,7 +122,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 						cEl = true
 					when "data-if"
 						## advanced stuff
-						statement = new ls( attr.value )
+						statement = new LogicalStatement( attr.value )
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
 						statement.variableDealer = @manageVariableDealer
@@ -151,7 +153,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 						cEl = true
 					when "data-repeat"
 						console.warn("Experimental data-repeat support!!!!")
-						statement = new cs( attr.value ) # TODO: Single Var Processor
+						statement = new ConcatStatement( attr.value ) # TODO: Single Var Processor
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
 						statement.variableDealer = @manageVariableDealer
@@ -188,7 +190,7 @@ context = #{iv}[k];
 						lc = { "t" : "repeat" }
 
 					when "data-html", "data-text"
-						statement = new cs( attr.value )
+						statement = new ConcatStatement( attr.value )
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
 
@@ -407,17 +409,29 @@ var #{@cntxt.name} = function(element, data) {
 #{@manageClass}
 """
 
-		#bf = new Function(@buildFunction)
+		return new T5Result({
+			"buildFunction" : @buildFunction,
+			"manageClass" : @manageClass
+		})
+
+class T5Result
+	constructor : (cns) ->
+		for k, value of cns
+			@[k] = value
+	build : (ent_provided) ->
+		if ent_provided
+			return new Function( "data", @buildFunction )
+		else
+			return new Function( "ent", "data", @buildFunction )
+	debug : () ->
 		console.log "#{k*1+1}: #{line}" for k, line of @buildFunction.toString().split("\n")
-
-
-		#console.log "--------"
-		#console.log bf()
 		console.log "--------"
-		console.log @manageClass
+		console.log "#{k*1+1}: #{line}" for k, line of @manageClass.split("\n")
 		console.log "--------"
 
-@compile = (str) ->
-	p = new T5()
-	p.compile(str)
-	return p
+@compile = (str, attrs) ->
+	attrs = attrs || {};
+
+	p = new T5(attrs.name? || "TPL")
+
+	return p.compile(str)

@@ -2,6 +2,9 @@ var gulp = require('gulp'),
 	peg = require('gulp-peg'),
 //	browserify = require('gulp-browserify'),
 	rename = require('gulp-rename'),
+	replace = require('gulp-replace'),
+	coffee = require('gulp-coffee'),
+	preprocess = require('gulp-preprocess'),
 	fileinclude = require('gulp-file-include');
 
 gulp.task("pegjs", function(){
@@ -13,6 +16,19 @@ gulp.task("pegjs", function(){
 		.pipe(peg())
 		.pipe(gulp.dest('peg/'));
 });
+
+gulp.task("dist-coffee", function(){
+	return gulp
+		.src("lib/T5.coffee")
+		.pipe(fileinclude({
+			"prefix" : "#"
+		}))
+		.pipe(preprocess({context: { dist : true } }))
+		.pipe(coffee())
+		.pipe(gulp.dest("gen/"));
+});
+
+gulp.task("dist", ["dist-coffee"]);
 
 /*
 

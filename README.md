@@ -23,6 +23,27 @@ when this has reached a point where it is stable enough to do so.
 
 More soon haha, this is currently very WIP
 
+## How to use
+
+	var t5 = require("t5");
+	tpl = t5.compile( "html string here" );
+	var buildFunction = tpl.build();
+	var manageClass = tpl.manageClass;
+
+buildFunction is a function which takes two parameters `ent` and `data`. This is
+because the nodejs modules don't work too well with dynamically creating
+functions :(
+
+manageClass is a string which will generate a class based on the name attribute
+(defaults to TPL), which can be initialised on the client like so:
+
+	var ins = new TPL( element, data );
+
+This allows you to dynamically change stuff.
+
+The result is a very limited `T5Result` class to ensure all of the ugly-ness is
+hidden away and only useful results are provided for you to use.
+
 ## Building
 
 This requires gulp and running `npm install`, but the default gulp task

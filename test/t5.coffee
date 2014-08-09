@@ -5,6 +5,8 @@ ent = require "ent"
 
 compile = (tpl, cb, data) ->
 	tpl = t5.compile(tpl)
+	tpl.debug()
+
 	jsdom.env
 		html: tpl.build()(ent, data),
 		scripts : [ "../node_modules/js-base64/base64.js", "../gen/ent.js" ]
