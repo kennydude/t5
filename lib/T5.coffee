@@ -390,6 +390,71 @@ Object.defineProperty(this, "#{k}", {
 
 """
 
+	precompileInclude : (node, template_loader) ->
+		if node.nodeName == "include"
+			# Find the template name
+			template_name = ""
+
+			for attr in node.attrs
+				if attr.name == "file"
+					template_name = attr.value
+
+			# Load it
+			parser = new parse5.Parser()
+			doc = parser.parseFragment(template_loader.getTemplate(template_name))
+
+			# Prepare switching
+			args = [
+				node.parentNode.childNodes.indexOf(node),
+				1
+			]
+			for n in doc.childNodes
+				args.push n
+
+			# Switch
+			node.parentNode.childNodes.splice.apply(
+				node.parentNode.childNodes,
+				args
+			)
+		else
+			if node.childNodes
+				for n in node.childNodes
+					@precompileInclude(n, template_loader)
+
+	precompileExtends : (node, doc, template_loader) ->
+		if node.nodeName == "extends"
+			# Find the template name
+			template_name = ""
+
+			for attr in node.attrs
+				if attr.name == "file"
+					template_name = attr.value
+
+			parser = new parse5.Parser()
+			n_doc = parser.parseFragment(template_loader.getTemplate(template_name))
+
+			## TODO: Make this work properly
+			doc.childNodes = n_doc.childNodes
+		else
+			if node.childNodes
+				for n in node.childNodes
+					@precompileExtends(n, doc, template_loader)
+
+	precompile : (template_name, template_loader) ->
+		# This does stuff like <include /> and <extends />
+		parser = new parse5.Parser()
+		doc = parser.parseFragment(template_loader.getTemplate(template_name))
+
+		# Stage 1: <include />
+		@precompileInclude(doc, template_loader)
+
+		# Stage 2: <extends />
+		@precompileExtends(doc, doc, template_loader)
+
+		# Stage 3: return
+		s = new parse5.TreeSerializer();
+		return s.serialize doc
+
 	compile : (str) ->
 		parser = new parse5.Parser()
 		doc = parser.parseFragment str
@@ -429,9 +494,31 @@ class T5Result
 		console.log "#{k*1+1}: #{line}" for k, line of @manageClass.split("\n")
 		console.log "--------"
 
+class @T5TemplateLoader
+	getTemplate: (template_name) ->
+		throw new Error("getTemplate() is not defined")
+
+fs = require "fs"
+path = require "path"
+
+class @T5FileTemplateLoader
+	constructor: (@dir) ->
+	getTemplate: (template_name) ->
+		return fs.readFileSync(path.join(@dir, template_name)).toString()
+
 @compile = (str, attrs) ->
 	attrs = attrs || {};
 
 	p = new T5(attrs.name? || "TPL")
 
 	return p.compile(str)
+
+@compileFile = (str, attrs) ->
+	attrs = attrs || {}
+	tl = attrs.loader || new T5FileTemplateLoader(".")
+
+	p = new T5(attrs.name? || "TPL")
+	tpl = p.precompile(str, tl)
+	console.log tpl
+
+	return p.compile(tpl)

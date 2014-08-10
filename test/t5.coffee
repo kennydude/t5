@@ -3,10 +3,19 @@ t5 = require("../lib/T5.coffee")
 jsdom = require("jsdom")
 ent = require "ent"
 
+compile_file = (tpl, cb, data) ->
+	tpl = t5.compileFile(tpl, {
+		loader : new t5.T5FileTemplateLoader(__dirname)
+	})
+	tpl.debug()
+	use_tpl(tpl, cb, data)
+
 compile = (tpl, cb, data) ->
 	tpl = t5.compile(tpl)
 	tpl.debug()
+	use_tpl(tpl, cb, data)
 
+use_tpl = (tpl, cb, data) ->
 	jsdom.env
 		html: tpl.build()(ent, data),
 		scripts : [ "../node_modules/js-base64/base64.js", "../gen/ent.js" ]
@@ -101,3 +110,21 @@ describe 'T5', () ->
 	<div id="debug"></div>
 </div>
 """, cb, d)
+
+	it 'should process a remote file fine', (done) ->
+		cb = (manage, el) ->
+			done()
+
+		compile_file("testA.html", cb, {})
+
+	it 'should process a remote file with include', (done) ->
+		cb = (manage, el) ->
+			done()
+
+		compile_file("testB.html", cb, {})
+
+	it 'should process a remote file with extends', (done) ->
+		cb = (manage, el) ->
+			done()
+
+		compile_file("testC.html", cb, {})
