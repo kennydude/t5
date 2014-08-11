@@ -77,4 +77,6 @@ class LogicalStatement
 
 		return vars
 
+# @exclude
 module.exports = LogicalStatement
+# @endexclude

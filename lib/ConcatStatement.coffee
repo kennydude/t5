@@ -1,4 +1,6 @@
+# @exclude
 LogicalStatement = require "./LogicalStatement"
+# @endexclude
 Cparser = require "../peg/ConcatSatement.js"
 
 class ConcatStatement extends LogicalStatement
@@ -6,4 +8,6 @@ class ConcatStatement extends LogicalStatement
         console.log "getParser()"
         return Cparser
 
+# @exclude
 module.exports = ConcatStatement
+# @endexclude

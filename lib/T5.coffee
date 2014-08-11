@@ -4,10 +4,12 @@ T5 is a template engine for NodeJS
 parse5 = require("parse5")
 #include("./LogicalStatement.coffee")
 #include("./ConcatStatement.coffee")
+#include("./T5Precompiler.coffee")
 
 # @exclude
 LogicalStatement = require("./LogicalStatement")
 ConcatStatement = require("./ConcatStatement")
+T5Precompiler = require("./T5Precompiler")
 # @endexclude
 ent = require "ent"
 
@@ -390,71 +392,6 @@ Object.defineProperty(this, "#{k}", {
 
 """
 
-	precompileInclude : (node, template_loader) ->
-		if node.nodeName == "include"
-			# Find the template name
-			template_name = ""
-
-			for attr in node.attrs
-				if attr.name == "file"
-					template_name = attr.value
-
-			# Load it
-			parser = new parse5.Parser()
-			doc = parser.parseFragment(template_loader.getTemplate(template_name))
-
-			# Prepare switching
-			args = [
-				node.parentNode.childNodes.indexOf(node),
-				1
-			]
-			for n in doc.childNodes
-				args.push n
-
-			# Switch
-			node.parentNode.childNodes.splice.apply(
-				node.parentNode.childNodes,
-				args
-			)
-		else
-			if node.childNodes
-				for n in node.childNodes
-					@precompileInclude(n, template_loader)
-
-	precompileExtends : (node, doc, template_loader) ->
-		if node.nodeName == "extends"
-			# Find the template name
-			template_name = ""
-
-			for attr in node.attrs
-				if attr.name == "file"
-					template_name = attr.value
-
-			parser = new parse5.Parser()
-			n_doc = parser.parseFragment(template_loader.getTemplate(template_name))
-
-			## TODO: Make this work properly
-			doc.childNodes = n_doc.childNodes
-		else
-			if node.childNodes
-				for n in node.childNodes
-					@precompileExtends(n, doc, template_loader)
-
-	precompile : (template_name, template_loader) ->
-		# This does stuff like <include /> and <extends />
-		parser = new parse5.Parser()
-		doc = parser.parseFragment(template_loader.getTemplate(template_name))
-
-		# Stage 1: <include />
-		@precompileInclude(doc, template_loader)
-
-		# Stage 2: <extends />
-		@precompileExtends(doc, doc, template_loader)
-
-		# Stage 3: return
-		s = new parse5.TreeSerializer();
-		return s.serialize doc
-
 	compile : (str) ->
 		parser = new parse5.Parser()
 		doc = parser.parseFragment str
@@ -518,7 +455,8 @@ class @T5FileTemplateLoader
 	tl = attrs.loader || new T5FileTemplateLoader(".")
 
 	p = new T5(attrs.name? || "TPL")
-	tpl = p.precompile(str, tl)
+	preC = new T5Precompiler()
+	tpl = preC.precompile(str, tl)
 	console.log tpl
 
 	return p.compile(tpl)
