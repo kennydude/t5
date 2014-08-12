@@ -16,8 +16,10 @@ compile = (tpl, cb, data) ->
 	use_tpl(tpl, cb, data)
 
 use_tpl = (tpl, cb, data) ->
+	h = tpl.build()(ent, data)
+	console.log h
 	jsdom.env
-		html: tpl.build()(ent, data),
+		html: "<html><body>#{h}</body></html>",
 		scripts : [ "../node_modules/js-base64/base64.js", "../gen/ent.js" ]
 		src : ["""
 // This is because atob and btoa are strangely not available
@@ -128,3 +130,58 @@ describe 'T5', () ->
 			done()
 
 		compile_file("testC.html", cb, {})
+
+	it 'deal with data-repeat and data-html', (done) ->
+		cb = (manage, el) ->
+			# TODO
+			done()
+
+		d = {
+			"myitem" : [
+				{ "value" : "X" },
+				{ "value" : "Y" }
+			]
+		}
+		compile("""
+<div>
+<div data-repeat="myitem" data-html="value" class="egg">
+	IK <!-- ok -->
+</div>
+</div>
+""", cb, d)
+
+	it 'deal with data-repeat and data-class', (done) ->
+		cb = (manage, el) ->
+			# TODO
+			done()
+
+		d = {
+			"myitem" : [
+				{ "value" : true },
+				{ "value" : false }
+			]
+		}
+		compile("""
+<div>
+<div data-repeat="myitem" data-class="pie: value" class="egg">
+IK <!-- ok -->
+</div>
+</div>
+""", cb, d)
+
+
+	it 'deal with data-attr', (done) ->
+		cb = (manage, el) ->
+			# TODO
+			done()
+
+		d = {
+			"myitem" : "okfish"
+		}
+		compile("""
+<div>
+<div data-attr="id: myitem">
+IK <!-- ok -->
+</div>
+</div>
+""", cb, d)

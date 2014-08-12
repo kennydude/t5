@@ -51,7 +51,7 @@ if (typeof process !== 'undefined' && process.title == "node") {
 """
 		@manageClassTPL = """
 this.element = element;
-if(!element) throw new Error("An element is required to attach the management class");
+if(!element) throw new Error("An element is required to attach the management class: " + this.constructor.name);
 var self = this;
 
 data = data || {};
@@ -81,12 +81,14 @@ self._#{varname}
 """
 
 	doNodes : (node) ->
+		# TODO: Make attrs[] not an array
 		bf = """
 attrs = {};
 attrs["class"] = ["t5-#{@clsCounter}"];\n
 """
-		lc = null # holding place for extra actions
+		lc = [] # holding place for extra actions
 		cEl = false
+		doChildren = true
 
 		# Do Attributes
 		if node.attrs
@@ -95,12 +97,29 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 				switch attr.name
 					when "class"
 						bf += """attrs["class"].push("#{attr.value}");\n"""
-					when "data-class"
-						l = attrs.value.split "\n"
+					when "data-class", "data-attr"
+						l = attr.value.split "\n"
 						for line in l
 							if line.trim() != ""
 								p = line.split(":", 2)
-								bf += """if(#{p[1]}){ attrs["class"].push("#{p[0]}")  }\n"""
+								# TODO: Management functions
+
+								if attr.name == "data-class"
+									statement = new LogicalStatement( p[1] )
+									statement.variableDealer = @variableDealer
+									bf += """if(#{statement.toJS()}){
+	attrs["class"].push(#{JSON.stringify(p[0])});
+}
+
+"""
+								else
+									statement = new ConcatStatement( p[1] )
+									statement.variableDealer = @variableDealer
+									bf += """
+attrs[#{JSON.stringify(p[0])}] = #{statement.toJS()};
+
+"""
+
 						cEl = true
 					when "data-show"
 						statement = new LogicalStatement( attr.value )
@@ -133,7 +152,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 						iv = statement.toJS()
 						statement.variableDealer = @manageVariableDealer
 
-						lc = { "t" : "if", "v" : iv, "mv" : statement.toJS() }
+						lc.push { "t" : "if", "v" : iv, "mv" : statement.toJS() }
 
 						fname = "_inTPL#{@clsCounter}_if"
 						if !@cntxt.manageItems[attr.value]
@@ -193,7 +212,7 @@ context = #{iv}[k];
 #{bf}
 """
 						#cEl = true
-						lc = { "t" : "repeat" }
+						lc.push { "t" : "repeat" }
 
 					when "data-html", "data-text"
 						statement = new ConcatStatement( attr.value )
@@ -223,10 +242,11 @@ context = #{iv}[k];
 
 """
 
-						lc = { "t": "html", "v" : """
+						lc.push { "t": "html", "v" : """
 o += #{iv};
 """ }
 						cEl = true
+						doChildren = false
 					else
 						bf += """attrs["#{attr.name}"] = "#{attr.value}";""";
 
@@ -263,8 +283,8 @@ o += fa.join(" ") + ">";\n
 				when "#comment"
 					bf = """o += "<!-- #{node.data} -->";\n"""
 
-		if lc != null
-			switch lc.t
+		for l in lc
+			switch l.t
 				when "repeat"
 					@stack.push @cntxt
 					ele = @cntxt.element
@@ -279,7 +299,7 @@ o += fa.join(" ") + ">";\n
 					@manageClass = ""
 
 				when "html"
-					bf += lc.v
+					bf += l.v
 				when "if"
 					@stack.push @cntxt
 					@cntxt = new T5Context()
@@ -314,12 +334,12 @@ if(#{lc.v}){
 		@buildFunction += bf
 		@cntxt.buildFunction += bf
 
-		if lc != null
-			if lc.t == "repeat"
+		for l in lc
+			if l.t == "repeat"
 				@cntxt.buildFunction = @cntxt.buildFunction.substr( @cntxt.buildFunction.indexOf("// end-data-repeat") )
 
 		@clsCounter += 1
-		if node.childNodes
+		if node.childNodes && doChildren
 			for n in node.childNodes
 				if node.childNodes?.length? > 0
 					@doNodes(n)
@@ -329,8 +349,8 @@ if(#{lc.v}){
 			bf = """
 o += "</#{node.nodeName}>";\n
 """
-			if lc != null ## TODO
-				switch lc.t
+			for l in lc
+				switch l.t
 					when "repeat"
 						mcl = @manageClass
 						@manageClass = @stack.pop()
@@ -339,7 +359,7 @@ o += "</#{node.nodeName}>";\n
 
 						@manageClass += """
 // THIS CLASS IS AUTOMATICALLY GENERATED
-var #{@cntxt.name} = function(element, data) {
+function #{@cntxt.name} (element, data) {
 	#{@manageClassTPL}
 
 	#{@manageClassConstructor}
@@ -382,7 +402,7 @@ if(#{lc.v}){
 		# Setup watcher things
 		for k, watching of @cntxt.manageItems
 			# TOOD: deal with object.this.that
-			console.log k, watching
+			#console.log k, watching
 			@manageClassConstructor += """
 Object.defineProperty(this, "#{k}", {
 	get : function(){
@@ -407,7 +427,7 @@ Object.defineProperty(this, "#{k}", {
 
 		@manageClass = """
 // THIS CLASS IS AUTOMATICALLY GENERATED
-var #{@cntxt.name} = function(element, data) {
+function #{@cntxt.name} (element, data) {
 	#{@manageClassTPL}
 
 #{@manageClassConstructor}
@@ -449,6 +469,5 @@ class T5Result
 	p = new T5(attrs.name? || "TPL")
 	preC = new T5Precompiler()
 	tpl = preC.precompile(str, tl)
-	console.log tpl
 
 	return p.compile(tpl)
