@@ -31,3 +31,18 @@ describe 'LogicalStatement', () ->
 		statement = new ls("""bob == "JOHN SMITH" """)
 		assert.deepEqual statement.variables(), ["bob"]
 		assert.equal statement.toJS(), 'bob == "JOHN SMITH"'
+
+	it 'should parse !bob correctly', () ->
+		statement = new ls("""!bob""")
+		assert.deepEqual statement.variables(), ["bob"]
+		assert.equal statement.toJS(), ' ( !bob )  == true'
+
+	it 'should parse not bob correctly', () ->
+		statement = new ls("""not bob""")
+		assert.deepEqual statement.variables(), ["bob"]
+		assert.equal statement.toJS(), ' ( !bob )  == true'
+
+	it 'should parse !bob and john correctly', () ->
+		statement = new ls("""!bob and john""")
+		assert.deepEqual statement.variables(), ["bob", "john"]
+		assert.equal statement.toJS(), ' ( !bob )  && john'

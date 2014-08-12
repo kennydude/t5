@@ -58,6 +58,8 @@ class LogicalStatement
 						o += JSON.stringify(item.value)
 					when "int"
 						o += item.value
+					when "not"
+						o += "!"
 					else
 						o += item.type
 

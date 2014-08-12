@@ -39,6 +39,7 @@ var __getvar = function(v){
 	for(var i in v){
 		r = r[v[i]];
 	}
+	if(r == null) return "";
 	return r;
 };
 if (typeof process !== 'undefined' && process.title == "node") {
@@ -306,7 +307,7 @@ o += fa.join(" ") + ">";\n
 					@cntxt.name = @name
 					@cntxt.element = "this.el#{@clsCounter}_pristine"
 					@manageClassConstructor += """
-if(#{lc.mv}){
+if(#{l.mv}){
 	this.el#{@clsCounter}_pristine = this.el#{@clsCounter};
 } else{
 	var elx = this.el#{@clsCounter}.childNodes[0].nodeValue.trim();
@@ -321,7 +322,7 @@ if(#{lc.mv}){
 }\n
 """
 					bf = """
-if(#{lc.v}){
+if(#{l.v}){
 	#{bf}
 } else{
 	o += "<span class=\\"t5-#{@clsCounter}\\"><!-- [t5] ";
@@ -386,7 +387,7 @@ context = stack.pop();
 					when "if"
 						@cntxt = @stack.pop()
 						bf = """
-if(#{lc.v}){
+if(#{l.v}){
 	#{bf}
 } else{
 	#{bf}

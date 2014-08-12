@@ -8,7 +8,10 @@ cb // Closing Bracket
   = ")" { return null }
 
 item
-  = ("!" / "not" spacing) variable / variable
+  = not variable / variable
+
+not
+ = ("!" / "not" spacing) { return {"type" : "not"} }
 
 variable
   = "true" { return {"type":"true"} } /
