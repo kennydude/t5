@@ -28,7 +28,7 @@ gulp.task("dist-coffee", function(){
 		.pipe(gulp.dest("gen/"));
 });
 
-gulp.task("dist", ["dist-coffee"]);
+gulp.task("dist", ["default", "dist-coffee"]);
 
 /*
 
