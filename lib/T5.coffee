@@ -5,11 +5,15 @@ parse5 = require("parse5")
 #include("./LogicalStatement.coffee")
 #include("./ConcatStatement.coffee")
 #include("./T5Precompiler.coffee")
+#include("./TemplateLoader.coffee")
 
 # @exclude
 LogicalStatement = require("./LogicalStatement")
 ConcatStatement = require("./ConcatStatement")
 T5Precompiler = require("./T5Precompiler")
+tl = require("./TemplateLoader")
+for k, item of tl
+	@[k] = item
 # @endexclude
 ent = require "ent"
 
@@ -430,18 +434,6 @@ class T5Result
 		console.log "--------"
 		console.log "#{k*1+1}: #{line}" for k, line of @manageClass.split("\n")
 		console.log "--------"
-
-class @T5TemplateLoader
-	getTemplate: (template_name) ->
-		throw new Error("getTemplate() is not defined")
-
-fs = require "fs"
-path = require "path"
-
-class @T5FileTemplateLoader
-	constructor: (@dir) ->
-	getTemplate: (template_name) ->
-		return fs.readFileSync(path.join(@dir, template_name)).toString()
 
 @compile = (str, attrs) ->
 	attrs = attrs || {};
