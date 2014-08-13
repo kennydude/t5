@@ -67,24 +67,24 @@ for(var k in data){ // Copy values into this class
 
 // Event Emitter
 // based on https://github.com/jeromeetienne/microevent.js
-this.bind = function(event, fct){
-	this._events = this._events || {};
-	this._events[event] = this._events[event]	|| [];
-	this._events[event].push(fct);
+self.bind = function(event, fct){
+	self._events = self._events || {};
+	self._events[event] = self._events[event]	|| [];
+	self._events[event].push(fct);
 };
-this.unbind	= function(event, fct){
-	this._events = this._events || {};
-	if( event in this._events === false  )	return;
-	this._events[event].splice(this._events[event].indexOf(fct), 1);
+self.unbind	= function(event, fct){
+	self._events = self._events || {};
+	if( event in self._events === false  )	return;
+	self._events[event].splice(self._events[event].indexOf(fct), 1);
 };
-this.trigger = function(event /* , args... */){
-	this._events = this._events || {};
-	if( event in this._events === false  )	return;
-	for(var i = 0; i < this._events[event].length; i++){
-		this._events[event][i].apply(this, Array.prototype.slice.call(arguments, 1));
+self.trigger = function(event /* , args... */){
+	self._events = self._events || {};
+	if( event in self._events === false  )	return;
+	for(var i = 0; i < self._events[event].length; i++){
+		self._events[event][i].apply(self, Array.prototype.slice.call(arguments, 1));
 	}
 };
-this.on = this.bind;
+self.on = self.bind;
 
 """
 		@buildFunction = """
@@ -216,8 +216,8 @@ if(v){
 						f = "function(){ self._modelChanged_#{@clsCounter}.call(self); }"
 						lc.push {"t" : "model", "x" : """
 this._modelChanged_IP#{@clsCounter} = false;
-this.el#{@clsCounter}.addEventListener("changed", #{f});
-this.el#{@clsCounter}.addEventListener("keyup", #{f});
+this.el#{@clsCounter}.addEventListener("change", #{f});
+this.el#{@clsCounter}.addEventListener("input", #{f});
 """}
 
 						cEl = true
