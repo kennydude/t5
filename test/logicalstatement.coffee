@@ -10,7 +10,7 @@ describe 'LogicalStatement', () ->
 	it 'should parse bob correctly', () ->
 		statement = new ls("bob")
 		assert.deepEqual statement.variables(), ["bob"]
-		assert.equal statement.toJS(), "bob == true"
+		assert.equal statement.toJS(), "bob"
 
 	it 'should parse bob > john correctly', () ->
 		statement = new ls("bob > john")
@@ -35,12 +35,12 @@ describe 'LogicalStatement', () ->
 	it 'should parse !bob correctly', () ->
 		statement = new ls("""!bob""")
 		assert.deepEqual statement.variables(), ["bob"]
-		assert.equal statement.toJS(), ' ( !bob )  == true'
+		assert.equal statement.toJS(), ' ( !bob ) '
 
 	it 'should parse not bob correctly', () ->
 		statement = new ls("""not bob""")
 		assert.deepEqual statement.variables(), ["bob"]
-		assert.equal statement.toJS(), ' ( !bob )  == true'
+		assert.equal statement.toJS(), ' ( !bob ) '
 
 	it 'should parse !bob and john correctly', () ->
 		statement = new ls("""!bob and john""")

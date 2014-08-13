@@ -4,12 +4,14 @@ T5 is a template engine for NodeJS
 parse5 = require("parse5")
 #include("./LogicalStatement.coffee")
 #include("./ConcatStatement.coffee")
+#include("./VariableStatement.coffee")
 #include("./T5Precompiler.coffee")
 #include("./TemplateLoader.coffee")
 
 # @exclude
 LogicalStatement = require("./LogicalStatement")
 ConcatStatement = require("./ConcatStatement")
+VariableStatement = require("./VariableStatement")
 T5Precompiler = require("./T5Precompiler")
 tl = require("./TemplateLoader")
 for k, item of tl
@@ -53,12 +55,37 @@ if (typeof process !== 'undefined' && process.title == "node") {
 		@manageClassTPL = """
 this.element = element;
 if(!element) throw new Error("An element is required to attach the management class: " + this.constructor.name);
+if(!element.classList.contains("t5-1")){
+	this.element = element.getElementsByClassName("t5-1")[0];
+}
 var self = this;
 
 data = data || {};
 for(var k in data){ // Copy values into this class
 	self["_" + k] = data[k];
 }
+
+// Event Emitter
+// based on https://github.com/jeromeetienne/microevent.js
+this.bind = function(event, fct){
+	this._events = this._events || {};
+	this._events[event] = this._events[event]	|| [];
+	this._events[event].push(fct);
+};
+this.unbind	= function(event, fct){
+	this._events = this._events || {};
+	if( event in this._events === false  )	return;
+	this._events[event].splice(this._events[event].indexOf(fct), 1);
+};
+this.trigger = function(event /* , args... */){
+	this._events = this._events || {};
+	if( event in this._events === false  )	return;
+	for(var i = 0; i < this._events[event].length; i++){
+		this._events[event][i].apply(this, Array.prototype.slice.call(arguments, 1));
+	}
+};
+this.on = this.bind;
+
 """
 		@buildFunction = """
 // THIS FUNCTION IS AUTOMATICALLY GENERATED
@@ -81,6 +108,12 @@ __getvar("#{varname}")
 self._#{varname}
 """
 
+	addSVars : (statement, fname) ->
+		for v in statement.vars()
+			if !@cntxt.manageItems[v]
+				@cntxt.manageItems[v] = []
+			@cntxt.manageItems[v].push fname
+
 	doNodes : (node) ->
 		# TODO: Make attrs[] not an array
 		bf = """
@@ -90,9 +123,15 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 		lc = [] # holding place for extra actions
 		cEl = false
 		doChildren = true
+		name = null
 
 		# Do Attributes
 		if node.attrs
+			# Try to find name
+			for attr in node.attrs
+				if attr.name == "data-name"
+					name = attr.value
+
 			for attr in node.attrs
 				#console.log attr
 				switch attr.name
@@ -100,7 +139,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 						bf += """attrs["class"].push("#{attr.value}");\n"""
 					when "data-class", "data-attr"
 						l = attr.value.split "\n"
-						for line in l
+						for lineNo, line of l
 							if line.trim() != ""
 								p = line.split(":", 2)
 								# TODO: Management functions
@@ -113,6 +152,24 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 }
 
 """
+									fname = "_inTPL#{@clsCounter}_class#{lineNo}"
+									@addSVars(statement, fname)
+									statement.variableDealer = @manageVariableDealer
+
+									cls = p[0].split(" ")
+									flist = ( JSON.stringify(x) for x in cls ).join(",")
+
+									@manageClass += """
+#{@cntxt.name}.prototype.#{fname} = function(){
+	var self = this;
+	if(#{statement.toJS()}){
+		this.el#{@clsCounter}.classList.add(#{flist});
+	} else{
+		this.el#{@clsCounter}.classList.remove(#{flist});
+	}
+};
+
+"""
 								else
 									statement = new ConcatStatement( p[1] )
 									statement.variableDealer = @variableDealer
@@ -122,6 +179,48 @@ attrs[#{JSON.stringify(p[0])}] = #{statement.toJS()};
 """
 
 						cEl = true
+					when "data-model"
+						statement = new VariableStatement( attr.value )
+						statement.variableDealer = @variableDealer
+
+						accepted = ["input", "textarea", "select"]
+						if accepted.indexOf(node.nodeName) == -1
+							throw new Error("data-model is only allowed on " + accepted + " elements")
+
+						bf += """
+var v = #{statement.toJS()};
+if(v){
+	attrs[#{JSON.stringify(p[0])}] = v;
+}
+
+"""
+						fname = "_inTPL#{@clsCounter}_model"
+						@addSVars(statement, fname)
+
+						statement.variableDealer = @manageVariableDealer
+						@manageClass += """
+#{@cntxt.name}.prototype.#{fname} = function(){
+	var self = this;
+	if(this._modelChanged_IP#{@clsCounter}) return;
+	this.el#{@clsCounter}.value = #{statement.toJS()};
+};
+#{@cntxt.name}.prototype._modelChanged_#{@clsCounter} = function(){
+	var self = this;
+	this._modelChanged_IP#{@clsCounter} = true;
+	#{statement.toJS()} = this.el#{@clsCounter}.value;
+	this.trigger("#{name}-changed");
+	this._modelChanged_IP#{@clsCounter} = false;
+}
+
+"""
+						f = "function(){ self._modelChanged_#{@clsCounter}.call(self); }"
+						lc.push {"t" : "model", "x" : """
+this._modelChanged_IP#{@clsCounter} = false;
+this.el#{@clsCounter}.addEventListener("changed", #{f});
+this.el#{@clsCounter}.addEventListener("keyup", #{f});
+"""}
+
+						cEl = true
 					when "data-show"
 						statement = new LogicalStatement( attr.value )
 						statement.variableDealer = @variableDealer
@@ -129,10 +228,7 @@ attrs[#{JSON.stringify(p[0])}] = #{statement.toJS()};
 						statement.variableDealer = @manageVariableDealer
 
 						fname = "_inTPL#{@clsCounter}_show"
-						for v in statement.vars()
-							if !@cntxt.manageItems[v]
-								@cntxt.manageItems[v] = []
-							@cntxt.manageItems[v].push(fname)
+						@addSVars(statement, fname)
 
 						@manageClass += """
 #{@cntxt.name}.prototype.#{fname} = function(){
@@ -156,9 +252,7 @@ attrs[#{JSON.stringify(p[0])}] = #{statement.toJS()};
 						lc.push { "t" : "if", "v" : iv, "mv" : statement.toJS() }
 
 						fname = "_inTPL#{@clsCounter}_if"
-						if !@cntxt.manageItems[attr.value]
-							@cntxt.manageItems[attr.value] = []
-						@cntxt.manageItems[attr.value].push(fname)
+						@addSVars(statement, fname)
 
 						@manageClass += """
 #{@cntxt.name}.prototype.#{fname} = function(){
@@ -179,7 +273,7 @@ attrs[#{JSON.stringify(p[0])}] = #{statement.toJS()};
 						cEl = true
 					when "data-repeat"
 						console.warn("Experimental data-repeat support!!!!")
-						statement = new ConcatStatement( attr.value ) # TODO: Single Var Processor
+						statement = new VariableStatement( attr.value )
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
 						statement.variableDealer = @manageVariableDealer
@@ -228,10 +322,7 @@ context = #{iv}[k];
 							iv = "ent.encode(#{iv} + \"\");"
 							fname = "_inTPL#{@clsCounter}_text"
 
-						for v in statement.vars()
-							if !@cntxt.manageItems[v]
-								@cntxt.manageItems[v] = []
-							@cntxt.manageItems[v].push(fname)
+						@addSVars(statement, fname)
 
 						statement.variableDealer = @manageVariableDealer
 						@manageClass += """
@@ -286,6 +377,8 @@ o += fa.join(" ") + ">";\n
 
 		for l in lc
 			switch l.t
+				when "model"
+					@manageClassConstructor += l.x
 				when "repeat"
 					@stack.push @cntxt
 					ele = @cntxt.element
@@ -307,11 +400,11 @@ o += fa.join(" ") + ">";\n
 					@cntxt.name = @name
 					@cntxt.element = "this.el#{@clsCounter}_pristine"
 					@manageClassConstructor += """
-if(#{l.mv}){
+if(this.el#{@clsCounter}.getAttribute("data-if") != "1"){
 	this.el#{@clsCounter}_pristine = this.el#{@clsCounter};
 } else{
-	var elx = this.el#{@clsCounter}.childNodes[0].nodeValue.trim();
-	if(elx.substr(0,3) != "[t5]"){
+	var elx = this.el#{@clsCounter}.firstChild.nodeValue.trim();
+	if(elx.substr(0,4) != "[t5]"){
 		console.warn("T5W: Comment is not valid!");
 	}
 	elx = atob(elx.substr(5));
@@ -325,7 +418,7 @@ if(#{l.mv}){
 if(#{l.v}){
 	#{bf}
 } else{
-	o += "<span class=\\"t5-#{@clsCounter}\\"><!-- [t5] ";
+	o += "<span data-if=\\"1\\" class=\\"t5-#{@clsCounter}\\"><!-- [t5] ";
 	var to = o;
 	o = "";
 	#{bf}
@@ -385,7 +478,14 @@ context = stack.pop();
 						@cntxt = @stack.pop()
 
 					when "if"
+						x = @cntxt.manageItems
 						@cntxt = @stack.pop()
+						for k, v of x
+							if !@cntxt.manageItems[k]
+								@cntxt.manageItems[k] = []
+							for i in v
+								@cntxt.manageItems[k].push i
+
 						bf = """
 if(#{l.v}){
 	#{bf}
@@ -401,10 +501,11 @@ if(#{l.v}){
 
 	doManageItems : () ->
 		# Setup watcher things
+		mc = ""
 		for k, watching of @cntxt.manageItems
 			# TOOD: deal with object.this.that
 			#console.log k, watching
-			@manageClassConstructor += """
+			mc += """
 Object.defineProperty(this, "#{k}", {
 	get : function(){
 		return self._#{k};
@@ -416,6 +517,7 @@ Object.defineProperty(this, "#{k}", {
 });
 
 """
+		@manageClassConstructor = "#{mc}\n\n#{@manageClassConstructor}"
 
 	compile : (str) ->
 		parser = new parse5.Parser()
@@ -467,7 +569,7 @@ class T5Result
 	attrs = attrs || {}
 	tl = attrs.loader || new T5FileTemplateLoader(".")
 
-	p = new T5(attrs.name? || "TPL")
+	p = new T5(attrs['name'] || "TPL")
 	preC = new T5Precompiler()
 	tpl = preC.precompile(str, tl)
 

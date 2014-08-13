@@ -8,17 +8,20 @@ cb // Closing Bracket
   = ")" { return null }
 
 item
-  = not variable / variable
+  = not thing / thing
 
 not
  = ("!" / "not" spacing) { return {"type" : "not"} }
 
-variable
+thing
   = "true" { return {"type":"true"} } /
     "false" { return {"type":"false"} } /
     digits: [0-9] + { return {"type":"int", "value" : parseInt(digits.join(""), 10) } } /
     "\"" literal:anything "\"" { return {"type":"literal", "value": literal.join("") } } /
-    variable: [a-zA-z\.] + { return { "type":"var", "value":variable.join("") }; }
+    variable
+
+variable
+  = variable: [a-zA-z\.] + { return { "type":"var", "value":variable.join("") }; }
 
 anything
   = ("\\\"" / [^\"]) +
