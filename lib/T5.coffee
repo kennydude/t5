@@ -134,6 +134,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 
 			for attr in node.attrs
 				#console.log attr
+				# TODO data-$class
 				switch attr.name
 					when "class"
 						bf += """attrs["class"].push("#{attr.value}");\n"""
@@ -190,7 +191,7 @@ attrs[#{JSON.stringify(p[0])}] = #{statement.toJS()};
 						bf += """
 var v = #{statement.toJS()};
 if(v){
-	attrs[#{JSON.stringify(p[0])}] = v;
+	attrs["value"] = v;
 }
 
 """
