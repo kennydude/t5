@@ -158,6 +158,10 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 									statement.variableDealer = @manageVariableDealer
 
 									cls = p[0].split(" ")
+									for k, v of cls
+										if v == ""
+											cls.splice(k, 1)
+									
 									flist = ( JSON.stringify(x) for x in cls ).join(",")
 
 									@manageClass += """

@@ -19,4 +19,4 @@ class @T5FallbackFileTemplateLoader
             filename = path.join basedir, template_name
             if fs.existsSync filename
                 return fs.readFileSync(filename).toString()
-        throw new Error("File not found")
+        throw new Error("File not found (#{template_name})")

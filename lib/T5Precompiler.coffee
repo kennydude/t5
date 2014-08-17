@@ -18,7 +18,7 @@ class T5Precompiler
 
             # Load it
             parser = new parse5.Parser()
-            doc = parser.parseFragment(template_loader.getTemplate(template_name))
+            doc = parser.parseFragment(preC.precompile(template_name, template_loader, true))
 
             @replaceNode(node, doc.childNodes)
         else
@@ -71,7 +71,7 @@ class T5Precompiler
             parser = new parse5.Parser()
             # Precompile anything in here
             preC = new T5Precompiler()
-            master_doc = parser.parseFragment(preC.precompile(template_name, template_loader))
+            master_doc = parser.parseFragment(preC.precompile(template_name, template_loader, true))
 
             # Target is the template we started with
             # Master is the template we are extending with
@@ -92,7 +92,7 @@ class T5Precompiler
                 for n in node.childNodes
                     @precompileExtends(n, doc, template_loader)
 
-    precompile : (template_name, template_loader) ->
+    precompile : (template_name, template_loader, sub) ->
         # This does stuff like <include /> and <extends />
         parser = new parse5.Parser()
         doc = parser.parseFragment(template_loader.getTemplate(template_name))
@@ -103,7 +103,14 @@ class T5Precompiler
         # Stage 2: <extends />
         @precompileExtends(doc, doc, template_loader)
 
-        # Stage 3: return
+        # Stage 3: remove any <block> left over
+        if !sub
+            @_TargetBlocks = []
+            @precompileFindBlocks("_TargetBlocks", doc)
+            for name, block of @_TargetBlocks
+                @replaceNode( block, block.childNodes )
+
+        # Stage 4: return
         s = new parse5.TreeSerializer();
         return s.serialize doc
 
