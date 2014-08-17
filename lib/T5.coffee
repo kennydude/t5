@@ -273,7 +273,6 @@ this.el#{@clsCounter}.addEventListener("input", #{f});
 
 						cEl = true
 					when "data-repeat"
-						console.warn("Experimental data-repeat support!!!!")
 						statement = new VariableStatement( attr.value )
 						statement.variableDealer = @variableDealer
 						iv = statement.toJS()
@@ -304,6 +303,12 @@ this.#{attr.value}.push = function(item){
 for(var k in #{iv}) {
 stack.push(context);
 context = #{iv}[k];
+var obj = context;
+if(typeof context != "object"){
+	context = {};
+}
+context['$key'] = k;
+context['$value'] = obj;
 // end-data-repeat
 #{bf}
 """
@@ -367,7 +372,6 @@ for(var an in attrs){
 o += fa.join(" ") + ">";\n
 """
 		else
-			#console.log node
 			switch node.nodeName
 				when "#document-fragment"
 					bf = ""

@@ -21,7 +21,7 @@ thing
     variable
 
 variable
-  = variable: [a-zA-z\.] + { return { "type":"var", "value":variable.join("") }; }
+  = variable: [a-zA-z\.\$] + { return { "type":"var", "value":variable.join("") }; }
 
 anything
   = ("\\\"" / [^\"]) +
