@@ -35,13 +35,21 @@ var context = data;
 var stack = [];
 var o = "";
 var attrs;
-var __getvar = function(v){
-	v = v.split(".");
-	r = context;
+var __getvar = function(raw_v, r, x){
+	var v = raw_v.split(".");
+	if(!r) r = context;
 	for(var i in v){
 		r = r[v[i]];
 	}
-	if(r == null) return "";
+	if(r == null){
+		if(stack.length > 0){
+			if(!x){ x = stack.length-1; }
+			else{ x = x - 1; }
+			if(x < 0){ return ""; }
+			return __getvar(raw_v, stack[x], x);
+		}
+		return "";
+	}
 	return r;
 };
 if (typeof process !== 'undefined' && process.title == "node") {
@@ -161,7 +169,7 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 									for k, v of cls
 										if v == ""
 											cls.splice(k, 1)
-									
+
 									flist = ( JSON.stringify(x) for x in cls ).join(",")
 
 									@manageClass += """
