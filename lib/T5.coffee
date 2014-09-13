@@ -45,6 +45,7 @@ var __getvar = function(raw_v, r, x){
 	if(!r) r = context;
 	for(var i in v){
 		r = r[v[i]];
+		if(r == null){ break; }
 	}
 	if(r == null){
 		if(stack.length > 0){
