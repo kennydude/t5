@@ -186,10 +186,6 @@ class @IfAttribute extends @SimpleAttribute
         @statement.variableDealer = @manageVariableDealer
         @readOnly = attr.readOnly
 
-        @bf_end = """
-
-"""
-
         @fname = "_inTPL#{name}_if"
         @name = name
 
@@ -408,5 +404,31 @@ return o;
             }\n
             """
         }
-
 registerAttribute(@RepeatAttribute, "repeat")
+
+class @OnAttribute extends @SimpleAttribute
+    constructor: (attr, name, cntxt) ->
+        @recordNode = true
+        @manageClassConstructor = ''
+
+        l = attr.value.split /[\n\,]/
+        for lineNo, line of l
+            if line.trim() != ""
+                p = line.split(":", 2)
+
+                if /^[a-zA-Z 0-9]+$/.test( p[1] )
+                    t = p[1].split(" ")
+                    a = []
+                    for v in t
+                        if v.trim() != ""
+                            a.push v
+
+                    f = "function(e){ self.trigger(#{JSON.stringify(a)}).call(self); }"
+                else
+                    f = "function(e){ (function(){ #{p[1]} }).call(self); }"
+
+                console.log "ON"
+                @manageClassConstructor += """
+this.#{name}.addEventListener(#{JSON.stringify(p[0])}, #{f});\n
+"""
+registerAttribute(@OnAttribute, "on")

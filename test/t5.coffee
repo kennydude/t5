@@ -41,7 +41,7 @@ window.template = new TPL( document.getElementsByTagName("div")[0], #{d} );
 				console.log "Errors while using jsdom: ", errors
 				throw new Error("JSDom didn't work")
 			el = window.document.getElementsByTagName("div")[0]
-			cb window.template, el
+			cb window.template, el, window
 
 describe 'T5', () ->
 	it 'simple data-show', (done) ->
@@ -120,7 +120,6 @@ describe 'T5', () ->
 </div>
 """, cb, d)
 
-'''
 	it 'should process a remote file fine', (done) ->
 		cb = (manage, el) ->
 			done()
@@ -193,4 +192,24 @@ IK <!-- ok -->
 </div>
 </div>
 """, cb, d)
-'''
+
+	it 'deal with data-on', (done) ->
+		cb = (manage, el, window) ->
+			manage.on "trigger", () ->
+				assert.equal this.xxxx, manage.xxxx
+				done()
+
+			# ty https://gist.github.com/tmpvar/1935579
+			clickEvent = window.document.createEvent('MouseEvent')
+			clickEvent.initEvent('click', true, true)
+			manage.xxxx.dispatchEvent(clickEvent)
+
+		d = {
+			"myitem" : "ok"
+		}
+
+		compile("""
+<div data-id="xxxx" data-on="click: trigger">
+
+</div>
+""", cb, d)

@@ -7,13 +7,22 @@ Typically you do this:
 	data + template => output
 
 But this only works in one place and it doesn't work well when you want to dynamically
-change the template but not rewrite the DOM (spoiling any CSS effects etc)
+change the template but not rewrite the DOM (spoiling any CSS effects etc).
 
-T5 works by producing two outputs:
+T5 does this:
 
-* Rendering function to do the traditional data+template=>output
-* Management class to alter the result dynamically without causing havoc to the
-  DOM
+	template => create-function + management-class
+
+Those two outputs use the same data (if you want to play safe):
+
+* Create Function - This is what you typically use and it'll spit out HTML
+  with your data added in.
+
+  **Note:** This output will have t5-x classes and some comments and the odd
+  `<span class="t5-x"><!-- [t5] base64 --></span>` and it's perfectly safe
+* Management Class - This will take in your DOM once rendered on-screen and
+  allow you to dynamically change the data and update affected elements (kind
+  of like [VueJS](http://vuejs.org), an inspiration for this project)
 
 This means that if you do not use XML/HTML or the DOM, this is pretty useless
 and you shouldn't use it.

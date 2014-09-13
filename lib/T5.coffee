@@ -152,7 +152,7 @@ attrs = { class : [] };\n
 		if node.attrs
 			# Try to find name
 			for attr in node.attrs
-				if attr.name == "data-name"
+				if attr.name == "data-name" || attr.name == "data-id"
 					name = attr.value
 
 			for attr in node.attrs
@@ -164,6 +164,9 @@ attrs = { class : [] };\n
 					if atName.charAt(0) == "$"
 						attr.readOnly = true
 						atName = atName.substr(1)
+
+					if atName == "name" || atName == "id"
+						continue # Ignore!
 
 					if module.exports.attributes[atName]
 						attribute = new module.exports.attributes[atName]( attr, name, @cntxt, node, @ )
@@ -205,241 +208,7 @@ attrs = { class : [] };\n
 						console.warn "#{atName} is not a currently supported property"
 				else
 					bf += """attrs["#{attr.name}"] = #{JSON.stringify(attr.value)};""";
-			###
-			legacy:
 
-			for attr in node.attrs
-				#console.log attr
-				# TODO data-$class
-				switch attr.name
-					when "class"
-						bf += """attrs["class"].push("#{attr.value}");\n"""
-					when "data-class", "data-attr"
-						l = attr.value.split "\n"
-						for lineNo, line of l
-							if line.trim() != ""
-								p = line.split(":", 2)
-								# TODO: Management functions
-
-								if attr.name == "data-class"
-									statement = new LogicalStatement( p[1] )
-									statement.variableDealer = @variableDealer
-									bf += """if(#{statement.toJS()}){
-	attrs["class"].push(#{JSON.stringify(p[0])});
-}
-
-"""
-									fname = "_inTPL#{@clsCounter}_class#{lineNo}"
-									@addSVars(statement, fname)
-									statement.variableDealer = @manageVariableDealer
-
-									cls = p[0].split(" ")
-									for k, v of cls
-										if v == ""
-											cls.splice(k, 1)
-
-									flist = ( JSON.stringify(x) for x in cls ).join(",")
-
-									@manageClass += """
-#{@cntxt.name}.prototype.#{fname} = function(){
-	var self = this;
-	if(#{statement.toJS()}){
-		this.el#{@clsCounter}.classList.add(#{flist});
-	} else{
-		this.el#{@clsCounter}.classList.remove(#{flist});
-	}
-};
-
-"""
-								else
-									statement = new ConcatStatement( p[1] )
-									statement.variableDealer = @variableDealer
-									bf += """
-attrs[#{JSON.stringify(p[0])}] = #{statement.toJS()};
-
-"""
-
-						cEl = true
-					when "data-model"
-						statement = new VariableStatement( attr.value )
-						statement.variableDealer = @variableDealer
-
-						accepted = ["input", "textarea", "select"]
-						if accepted.indexOf(node.nodeName) == -1
-							throw new Error("data-model is only allowed on " + accepted + " elements")
-
-						bf += """
-var v = #{statement.toJS()};
-if(v){
-	attrs["value"] = v;
-}
-
-"""
-						fname = "_inTPL#{@clsCounter}_model"
-						@addSVars(statement, fname)
-
-						statement.variableDealer = @manageVariableDealer
-						@manageClass += """
-#{@cntxt.name}.prototype.#{fname} = function(){
-	var self = this;
-	if(this._modelChanged_IP#{@clsCounter}) return;
-	this.el#{@clsCounter}.value = #{statement.toJS()};
-};
-#{@cntxt.name}.prototype._modelChanged_#{@clsCounter} = function(){
-	var self = this;
-	this._modelChanged_IP#{@clsCounter} = true;
-	#{statement.toJS()} = this.el#{@clsCounter}.value;
-	this.trigger("#{name}-changed");
-	this._modelChanged_IP#{@clsCounter} = false;
-}
-
-"""
-						f = "function(){ self._modelChanged_#{@clsCounter}.call(self); }"
-						lc.push {"t" : "model", "x" : """
-this._modelChanged_IP#{@clsCounter} = false;
-this.el#{@clsCounter}.addEventListener("change", #{f});
-this.el#{@clsCounter}.addEventListener("input", #{f});
-"""}
-
-						cEl = true
-					when "data-show"
-						statement = new LogicalStatement( attr.value )
-						statement.variableDealer = @variableDealer
-						bf += """if(!(#{statement.toJS()})){ attrs["style"] = "display: none"; }\n"""
-						statement.variableDealer = @manageVariableDealer
-
-						fname = "_inTPL#{@clsCounter}_show"
-						@addSVars(statement, fname)
-
-						@manageClass += """
-#{@cntxt.name}.prototype.#{fname} = function(){
-	var self = this;
-	var s = '';
-	if(!(#{statement.toJS()})){
-		s = 'display: none';
-	}
-	this.el#{@clsCounter}.style.display = s;
-};
-
-"""
-						cEl = true
-					when "data-if"
-						## advanced stuff
-						statement = new LogicalStatement( attr.value )
-						statement.variableDealer = @variableDealer
-						iv = statement.toJS()
-						statement.variableDealer = @manageVariableDealer
-
-						lc.push { "t" : "if", "v" : iv, "mv" : statement.toJS() }
-
-						fname = "_inTPL#{@clsCounter}_if"
-						@addSVars(statement, fname)
-
-						@manageClass += """
-#{@cntxt.name}.prototype.#{fname} = function(){
-	var self = this;
-	var element;
-	if(#{statement.toJS()}){
-		element = this.el#{@clsCounter}_pristine;
-	} else{
-		element = document.createComment("[t5-hidden]");
-	}
-
-	this.el#{@clsCounter}.parentNode.replaceChild( element, this.el#{@clsCounter} );
-	this.el#{@clsCounter} = element;
-};
-
-"""
-
-						cEl = true
-					when "data-repeat"
-						statement = new VariableStatement( attr.value )
-						statement.variableDealer = @variableDealer
-						iv = statement.toJS()
-						statement.variableDealer = @manageVariableDealer
-
-						@manageClassConstructor += """
-this.#{attr.value} = [];
-var els = self.element.getElementsByClassName("t5-#{@clsCounter}");
-for(var k in #{statement.toJS()}){
-	this.#{attr.value}.push( new #{@name}_sub#{@clsCounter}(els[k], #{statement.toJS()}[k]) );
-}
-this.#{attr.value}.push = function(item){
-	// add a new item
-	var el = document.createElement("div");
-	el.innerHTML = #{@name}_sub#{@clsCounter}.buildFunction(ent, item);
-	var elm = el.childNodes[0];
-	var els = self.element.getElementsByClassName("t5-#{@clsCounter}");
-	el = els[ els.length - 1 ];
-	el.parentNode.insertBefore( elm, el.nextSibling );
-
-	var ni = new #{@name}_sub#{@clsCounter}(elm, item);
-
-	return Array.prototype.push.apply(this, [ ni ]);
-};\n
-"""
-						bf = """
-// data-repeat
-for(var k in #{iv}) {
-stack.push(context);
-context = #{iv}[k];
-var obj = context;
-if(typeof context != "object"){
-	context = {};
-}
-context['$key'] = k;
-context['$value'] = obj;
-// end-data-repeat
-#{bf}
-"""
-						#cEl = true
-						lc.push { "t" : "repeat" }
-
-					when "data-html", "data-text"
-						statement = new ConcatStatement( attr.value )
-						statement.variableDealer = @variableDealer
-						iv = statement.toJS()
-
-						fname = "_inTPL#{@clsCounter}_html"
-
-						method = "innerHTML"
-						if attr.name == "data-text"
-							method = "textContent"
-							iv = "ent.encode(#{iv} + \"\");"
-							fname = "_inTPL#{@clsCounter}_text"
-
-						@addSVars(statement, fname)
-
-						statement.variableDealer = @manageVariableDealer
-						@manageClass += """
-#{@cntxt.name}.prototype.#{fname} = function(){
-	var self = this;
-	var s = #{statement.toJS()};
-	this.el#{@clsCounter}.#{method} = s;
-};
-
-"""
-
-						lc.push { "t": "html", "v" : """
-o += #{iv};
-""" }
-						cEl = true
-						doChildren = false
-					else
-						bf += """attrs["#{attr.name}"] = "#{attr.value}";""";
-
-		if cEl
-			if node.parentNode.nodeName == "#document-fragment" # Top-level element
-				@manageClassConstructor += """
-this.el#{@clsCounter} = #{@cntxt.element};
-
-"""
-			else
-				@manageClassConstructor += """
-this.el#{@clsCounter} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCounter}")[0];
-
-"""
-		###
 		if cEL
 			bf += """attrs["class"].push("t5-#{@clsCounter}");"""
 
@@ -468,58 +237,6 @@ o += "<#{node.nodeName} " + doAttributes(attrs) + ">";\n
 				if r.skipChildren
 					doChildren = false
 
-		###
-		for l in lc
-			switch l.t
-				when "model"
-					@manageClassConstructor += l.x
-				when "repeat"
-					@stack.push @cntxt
-					ele = @cntxt.element
-					@cntxt = new T5Context()
-					@cntxt.element = ele
-					@cntxt.name = "#{@name}_sub#{@clsCounter}"
-
-					@stack.push @manageClassConstructor
-					@manageClassConstructor = ""
-
-					@stack.push @manageClass
-					@manageClass = ""
-
-				when "html"
-					bf += l.v
-				when "if"
-					@stack.push @cntxt
-					@cntxt = new T5Context()
-					@cntxt.name = @name
-					@cntxt.element = "this.el#{@clsCounter}_pristine"
-					@manageClassConstructor += """
-if(this.el#{@clsCounter}.getAttribute("data-if") != "1"){
-	this.el#{@clsCounter}_pristine = this.el#{@clsCounter};
-} else{
-	var elx = this.el#{@clsCounter}.firstChild.nodeValue.trim();
-	if(elx.substr(0,4) != "[t5]"){
-		console.warn("T5W: Comment is not valid!");
-	}
-	elx = atob(elx.substr(5));
-
-	var el = document.createElement("div");
-	el.innerHTML = elx;
-	this.el#{@clsCounter}_pristine = el.childNodes[0];
-}\n
-"""
-					bf = """
-if(#{l.v}){
-	#{bf}
-} else{
-	o += "<span data-if=\\"1\\" class=\\"t5-#{@clsCounter}\\"><!-- [t5] ";
-	var to = o;
-	o = "";
-	#{bf}
-}\n
-"""
-		###
-
 		@buildFunction += bf
 		@cntxt.buildFunction += bf
 
@@ -542,61 +259,7 @@ o += "</#{node.nodeName}>";\n
 					if r.replaceBuildFunction
 						bf = r.replaceBuildFunction
 
-			###
-			for l in lc
-				switch l.t
-					when "repeat"
-						mcl = @manageClass
-						@manageClass = @stack.pop()
 
-						@doManageItems()
-
-						@manageClass += """
-// THIS CLASS IS AUTOMATICALLY GENERATED
-function #{@cntxt.name} (element, data) {
-	#{@manageClassTPL}
-
-	#{@manageClassConstructor}
-}
-#{@cntxt.name}.buildFunction = function(ent, data){
-	#{@buildFunctionTPL}
-
-	#{@cntxt.buildFunction}
-	#{bf}
-
-	return o;
-}
-
-
-#{mcl}
-"""
-						bf += """
-context = stack.pop();
-}\n
-"""
-						@manageClassConstructor = @stack.pop()
-						@cntxt = @stack.pop()
-
-					when "if"
-						x = @cntxt.manageItems
-						@cntxt = @stack.pop()
-						for k, v of x
-							if !@cntxt.manageItems[k]
-								@cntxt.manageItems[k] = []
-							for i in v
-								@cntxt.manageItems[k].push i
-
-						bf = """
-if(#{l.v}){
-	#{bf}
-} else{
-	#{bf}
-	var x = btoa(o);
-	o = to;
-	o += x + " --\></span>";
-}\n
-"""
-			###
 			@cntxt.buildFunction += bf
 			@buildFunction += bf
 
