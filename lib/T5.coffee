@@ -177,10 +177,11 @@ attrs = { class : [] };\n
 						mc = attribute.managementClass()
 
 						if mc.body && !attr.readOnly
-							cEL = true
 							@manageClass += mc.body
 							# If there's a body, it's likely we'll need this!
 
+						if (mc.body || mc.recordNode) && !attr.readOnly
+							cEL = true
 							if node.parentNode.nodeName == "#document-fragment" # Top-level element
 								@manageClassConstructor += """
 				this.#{name} = #{@cntxt.element};
@@ -191,8 +192,8 @@ attrs = { class : [] };\n
 				this.#{name} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCounter}")[0];
 
 				"""
-							if mc.constructor
-								@manageClassConstructor += mc.constructor
+						if mc.constructor
+							@manageClassConstructor += mc.constructor
 
 						for v, fname of mc.events
 							if !@cntxt.manageItems[v]
@@ -442,7 +443,7 @@ this.el#{@clsCounter} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCount
 		if cEL
 			bf += """attrs["class"].push("t5-#{@clsCounter}");"""
 
-		if node.nodeName.charAt(0) != "#" ## TODO: MAKE THIS SAFER
+		if node.nodeName.charAt(0) != "#"
 			bf += """
 o += "<#{node.nodeName} " + doAttributes(attrs) + ">";\n
 """
@@ -464,6 +465,8 @@ o += "<#{node.nodeName} " + doAttributes(attrs) + ">";\n
 					bf += r.buildFunction
 				if r.replaceBuildFunction
 					bf = r.replaceBuildFunction
+				if r.skipChildren
+					doChildren = false
 
 		###
 		for l in lc
@@ -519,10 +522,6 @@ if(#{l.v}){
 
 		@buildFunction += bf
 		@cntxt.buildFunction += bf
-
-		for l in lc
-			if l.t == "repeat"
-				@cntxt.buildFunction = @cntxt.buildFunction.substr( @cntxt.buildFunction.indexOf("// end-data-repeat") )
 
 		@clsCounter += 1
 		if node.childNodes && doChildren
@@ -654,10 +653,19 @@ class T5Result
 			return new Function( "data", @buildFunction )
 		else
 			return new Function( "ent", "data", @buildFunction )
-	debug : () ->
-		console.log "#{k*1+1}: #{line}" for k, line of @buildFunction.toString().split("\n")
+	debug : (prefix) ->
+		if !prefix
+			prefix = 1
+
+		pad = (i) ->
+			x = i.toString()
+			while (x.length != 3)
+				x = ' ' + x
+			return x
+
+		console.log "#{pad(k*1+prefix)}: #{line}" for k, line of @buildFunction.toString().split("\n")
 		console.log "--------"
-		console.log "#{k*1+1}: #{line}" for k, line of @manageClass.split("\n")
+		console.log "#{pad(k*1+prefix)}: #{line}" for k, line of @manageClass.split("\n")
 		console.log "--------"
 
 @compile = (str, attrs) ->

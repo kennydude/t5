@@ -12,12 +12,13 @@ compile_file = (tpl, cb, data) ->
 
 compile = (tpl, cb, data) ->
 	tpl = t5.compile(tpl)
-	tpl.debug()
+	tpl.debug(8)
 	use_tpl(tpl, cb, data)
 
 use_tpl = (tpl, cb, data) ->
+	d = JSON.stringify data
 	h = tpl.build()(ent, data)
-	console.log "initial build:", h
+	console.log "initial build:", h, d
 	jsdom.env
 		html: "<html><body>#{h}</body></html>",
 		scripts : [ "../node_modules/js-base64/base64.js", "../gen/ent.js" ]
@@ -29,10 +30,11 @@ window.btoa = function(i){
 window.atob = function(i){
 	return Base64.decode(i);
 }
+console.log(">>> jsdom");
 
 #{tpl.manageClass}
 
-window.template = new TPL(document.getElementsByTagName("div")[0], #{JSON.stringify(data)});
+window.template = new TPL( document.getElementsByTagName("div")[0], #{d} );
 """]
 		done: (errors, window) ->
 			if errors

@@ -20,8 +20,8 @@ console.log @attributes
 class @T5Attribute
     buildFunction: () ->
         throw new Error("buildFunction() is not implemented")
-    manageClass: () ->
-        throw new Error("manageClass() is not implemented")
+    managementClass: () ->
+        throw new Error("managementClass() is not implemented")
     beforeChildren: () ->
         # Nothing
     afterChildren: () ->
@@ -45,13 +45,15 @@ self._#{varname}
         }
     managementClass : () ->
         events = {}
-        for v in @statement.vars()
-            events[v] = @fname
+        if @statement
+            for v in @statement.vars()
+                events[v] = @fname
 
         return {
             body : @manageClass,
             events : events,
-            constructor : @manageClassConstructor
+            constructor : @manageClassConstructor,
+            recordNode : @recordNode
         }
 
 class @ClassAttribute extends @SimpleAttribute
@@ -166,15 +168,13 @@ attrs["value"] = v;
 }
 
 """
-        f = "function(){ self._modelChanged_#{@clsCounter}.call(self); }"
+        f = "function(){ self._modelChanged_#{name}.call(self); }"
 
         @mangeClassConstructor = """
 this._modelChanged_IP#{name} = false;
 this.#{name}.addEventListener("change", #{f});
-this.#{name}.addEventListener("input", #{f});
+this.#{name}.addEventListener("input", #{f});\n
 """
-
-        '''lc.push {"t" : "model", "x" : }'''
 
 registerAttribute(@ModelAttribute, "model")
 
@@ -206,7 +206,7 @@ if(#{@statement.toJS()}){
 
 this.#{name}.parentNode.replaceChild( element, this.#{name} );
 this.#{name} = element;
-};
+};\n
 """
         @manageClassConstructor = """
 if(this.#{name}.getAttribute("data-if") != "1"){
@@ -232,7 +232,7 @@ if(this.#{name}.getAttribute("data-if") != "1"){
         t5.cntxt.element = "this.#{@name}_pristine"
 
         f = """
-o += "<span data-if=\\"1\\" class=\\"t5-#{t5.clsCounter}\\"><!-- [t5] ";
+o += "<span data-if=\\"1\\" class=\\"t5-#{t5.clsCounter}\\"><!-- [t5] ";\n
 """
         if @readOnly
             f = ''
@@ -246,7 +246,7 @@ if(#{@iv}){
 var to = o;
 o = "";
 #{bf}
-}
+}\n
 """
         }
 
@@ -259,7 +259,7 @@ o = "";
             for i in v
                 t5.cntxt.manageItems[k].push i
 
-        f = 'o += x + " --\></span>";'
+        f = 'o += x + " --\></span>";\n'
         if @readOnly
             f = ''
 
@@ -305,8 +305,108 @@ this.#{name}.#{method} = s;
         return {
             buildFunction: """
 o += #{@iv};
-"""
+""",
+            skipChildren : true
         }
 
 registerAttribute(@ContentsAttribute, "text")
 registerAttribute(@ContentsAttribute, "html")
+
+class @RepeatAttribute extends @SimpleAttribute
+    constructor: (attr, @name, cntxt, node, t5) ->
+        statement = new VariableStatement( attr.value )
+        statement.variableDealer = @variableDealer
+        @iv = statement.toJS()
+        statement.variableDealer = @manageVariableDealer
+
+        @recordNode = true
+        @manageClassConstructor = """
+this.#{attr.value} = [];
+var els = #{cntxt.element}.getElementsByClassName("t5-#{t5.clsCounter}");
+for(var k in #{statement.toJS()}){
+    this.#{attr.value}.push( new #{t5.name}_sub#{@name}( els[k], #{statement.toJS()}[k]) );
+}
+this.#{attr.value}.push = function(item){
+    return (function(){
+        // add a new item
+        var el = document.createElement("div");
+        el.innerHTML = #{t5.name}_sub#{@name}.buildFunction(ent, item);
+        var elm = el.childNodes[0];
+        var els = #{cntxt.element}.getElementsByClassName("t5-#{t5.clsCounter}");
+        var is = els[ els.length - 1 ];
+        is.parentNode.insertBefore( elm, is.nextSibling );
+        var ni = new #{t5.name}_sub#{name}(elm, item);
+        return Array.prototype.push.apply(this, [ ni ]);
+    }).call(self, [item]);
+};\n
+"""
+    beforeChildren: (t5, bf) ->
+        t5.stack.push t5.cntxt
+        ele = t5.cntxt.element
+        t5.cntxt = new T5Context()
+        t5.cntxt.element = ele
+        t5.cntxt.name = "#{t5.name}_sub#{@name}"
+
+        t5.stack.push t5.manageClassConstructor
+        t5.manageClassConstructor = ""
+
+        t5.stack.push t5.manageClass
+        t5.manageClass = ""
+
+        return {
+            replaceBuildFunction : """
+// data-repeat
+for(var k in #{@iv}) {
+stack.push(context);
+context = #{@iv}[k];
+var obj = context;
+if(typeof context != "object"){
+    context = {};
+}
+context['$key'] = k;
+context['$value'] = obj;
+// end-data-repeat
+#{bf}
+\n
+"""
+        }
+
+    afterChildren : (t5, bf) ->
+        mcl = t5.manageClass
+        t5.doManageItems()
+
+        t5.manageClass = t5.stack.pop()
+
+        t5.cntxt.buildFunction = t5.cntxt.buildFunction.substr( t5.cntxt.buildFunction.indexOf("// end-data-repeat") )
+
+        t5.manageClass += """
+// THIS CLASS IS AUTOMATICALLY GENERATED
+function #{t5.cntxt.name} (element, data) {
+#{t5.manageClassTPL}
+
+#{t5.manageClassConstructor}
+}
+#{t5.cntxt.name}.buildFunction = function(ent, data){
+#{t5.buildFunctionTPL}
+
+#{t5.cntxt.buildFunction}
+#{bf}
+
+return o;
+}
+
+#{mcl}
+\n
+"""
+
+        t5.manageClassConstructor = t5.stack.pop()
+        t5.cntxt = t5.stack.pop()
+
+        return {
+            buildFunction : """
+                context = stack.pop();
+            }\n
+            """
+        }
+
+registerAttribute(@RepeatAttribute, "repeat")
