@@ -17,7 +17,7 @@ compile = (tpl, cb, data) ->
 
 use_tpl = (tpl, cb, data) ->
 	h = tpl.build()(ent, data)
-	console.log h
+	console.log "initial build:", h
 	jsdom.env
 		html: "<html><body>#{h}</body></html>",
 		scripts : [ "../node_modules/js-base64/base64.js", "../gen/ent.js" ]
@@ -44,8 +44,10 @@ window.template = new TPL(document.getElementsByTagName("div")[0], #{JSON.string
 describe 'T5', () ->
 	it 'simple data-show', (done) ->
 		cb = (manage, el) ->
+			console.log el.outerHTML
 			assert.equal el.getAttribute("style"), "display: none"
 			manage.myitem = true
+			console.log el.outerHTML
 			assert.equal el.getAttribute("style"), ""
 			done()
 
@@ -68,6 +70,9 @@ describe 'T5', () ->
 			console.log el.outerHTML
 			done()
 
+		d = {
+			myvalue : "pie"
+		}
 		compile("""
 <div class="something important lmfao">
 	<div data-if="myitem" class="egg">
@@ -113,6 +118,7 @@ describe 'T5', () ->
 </div>
 """, cb, d)
 
+'''
 	it 'should process a remote file fine', (done) ->
 		cb = (manage, el) ->
 			done()
@@ -185,3 +191,4 @@ IK <!-- ok -->
 </div>
 </div>
 """, cb, d)
+'''

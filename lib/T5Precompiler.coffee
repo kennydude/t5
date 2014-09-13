@@ -18,6 +18,7 @@ class T5Precompiler
 
             # Load it
             parser = new parse5.Parser()
+            preC = new T5Precompiler()
             doc = parser.parseFragment(preC.precompile(template_name, template_loader, true))
 
             @replaceNode(node, doc.childNodes)

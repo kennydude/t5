@@ -7,15 +7,20 @@ parse5 = require("parse5")
 #include("./VariableStatement.coffee")
 #include("./T5Precompiler.coffee")
 #include("./TemplateLoader.coffee")
+#include("./T5Attributes.coffee")
 
 # @exclude
 LogicalStatement = require("./LogicalStatement")
 ConcatStatement = require("./ConcatStatement")
 VariableStatement = require("./VariableStatement")
 T5Precompiler = require("./T5Precompiler")
-tl = require("./TemplateLoader")
-for k, item of tl
-	@[k] = item
+
+merge = (tl) =>
+	for k, item of tl
+		@[k] = item
+
+merge(require("./TemplateLoader"))
+merge(require("./T5Attributes"))
 # @endexclude
 ent = require "ent"
 
@@ -52,6 +57,15 @@ var __getvar = function(raw_v, r, x){
 	}
 	return r;
 };
+var doAttributes = function(attrs){
+	var fa = [];
+	for(var an in attrs){
+		var av = attrs[an];
+		if(an == "class"){ av = av.join(" "); }
+		fa.push( an + '="' + ent.encode(av+"") + '"');
+	}
+	return fa.join(" ");
+}
 if (typeof process !== 'undefined' && process.title == "node") {
 	// NodeJS is supported!
 	var btoa = function(i){
@@ -63,8 +77,10 @@ if (typeof process !== 'undefined' && process.title == "node") {
 		@manageClassTPL = """
 this.element = element;
 if(!element) throw new Error("An element is required to attach the management class: " + this.constructor.name);
-if(!element.classList.contains("t5-1")){
-	this.element = element.getElementsByClassName("t5-1")[0];
+if(element['classList']){
+	if(!element.classList.contains("t5-1")){
+		this.element = element.getElementsByClassName("t5-1")[0];
+	}
 }
 var self = this;
 
@@ -123,15 +139,14 @@ self._#{varname}
 			@cntxt.manageItems[v].push fname
 
 	doNodes : (node) ->
-		# TODO: Make attrs[] not an array
 		bf = """
-attrs = {};
-attrs["class"] = ["t5-#{@clsCounter}"];\n
+attrs = { class : [] };\n
 """
 		lc = [] # holding place for extra actions
 		cEl = false
 		doChildren = true
-		name = null
+		name = "el#{@clsCounter}"
+		afterB = ""
 
 		# Do Attributes
 		if node.attrs
@@ -139,6 +154,58 @@ attrs["class"] = ["t5-#{@clsCounter}"];\n
 			for attr in node.attrs
 				if attr.name == "data-name"
 					name = attr.value
+
+			for attr in node.attrs
+				if attr.name == "class"
+					bf += """attrs["class"].push(#{JSON.stringify(attr.value)});\n"""
+				else if attr.name.substr(0,5) == "data-" or attr.name.substr(0,2) == "v-"
+					atName = attr.name.substr( attr.name.indexOf("-")+1 )
+					attr.readOnly = false
+					if atName.charAt(0) == "$"
+						attr.readOnly = true
+						atName = atName.substr(1)
+
+					if module.exports.attributes[atName]
+						attribute = new module.exports.attributes[atName]( attr, name, @cntxt, node, @ )
+						build = attribute.buildFunction()
+
+						if build.body
+							bf += build.body
+						if build.end
+							afterB += build.end
+
+						mc = attribute.managementClass()
+
+						if mc.body && !attr.readOnly
+							cEL = true
+							@manageClass += mc.body
+							# If there's a body, it's likely we'll need this!
+
+							if node.parentNode.nodeName == "#document-fragment" # Top-level element
+								@manageClassConstructor += """
+				this.#{name} = #{@cntxt.element};
+
+				"""
+							else
+								@manageClassConstructor += """
+				this.#{name} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCounter}")[0];
+
+				"""
+							if mc.constructor
+								@manageClassConstructor += mc.constructor
+
+						for v, fname of mc.events
+							if !@cntxt.manageItems[v]
+								@cntxt.manageItems[v] = []
+							@cntxt.manageItems[v].push fname
+
+						lc.push attribute
+					else
+						console.warn "#{atName} is not a currently supported property"
+				else
+					bf += """attrs["#{attr.name}"] = #{JSON.stringify(attr.value)};""";
+			###
+			legacy:
 
 			for attr in node.attrs
 				#console.log attr
@@ -371,17 +438,13 @@ this.el#{@clsCounter} = #{@cntxt.element};
 this.el#{@clsCounter} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCounter}")[0];
 
 """
+		###
+		if cEL
+			bf += """attrs["class"].push("t5-#{@clsCounter}");"""
 
 		if node.nodeName.charAt(0) != "#" ## TODO: MAKE THIS SAFER
 			bf += """
-o += "<#{node.nodeName} ";
-var fa = [];
-for(var an in attrs){
-	var av = attrs[an];
-	if(an == "class"){ av = av.join(" "); }
-	fa.push( an + '="' + ent.encode(av+"") + '"');
-}
-o += fa.join(" ") + ">";\n
+o += "<#{node.nodeName} " + doAttributes(attrs) + ">";\n
 """
 		else
 			switch node.nodeName
@@ -392,6 +455,17 @@ o += fa.join(" ") + ">";\n
 				when "#comment"
 					bf = """o += "<!-- #{node.data} -->";\n"""
 
+		bf += afterB
+
+		for l in lc
+			r = l.beforeChildren @, bf
+			if r
+				if r.buildFunction
+					bf += r.buildFunction
+				if r.replaceBuildFunction
+					bf = r.replaceBuildFunction
+
+		###
 		for l in lc
 			switch l.t
 				when "model"
@@ -441,6 +515,7 @@ if(#{l.v}){
 	#{bf}
 }\n
 """
+		###
 
 		@buildFunction += bf
 		@cntxt.buildFunction += bf
@@ -460,6 +535,15 @@ if(#{l.v}){
 			bf = """
 o += "</#{node.nodeName}>";\n
 """
+			for l in lc
+				r = l.afterChildren @, bf
+				if r
+					if r.buildFunction
+						bf += r.buildFunction
+					if r.replaceBuildFunction
+						bf = r.replaceBuildFunction
+
+			###
 			for l in lc
 				switch l.t
 					when "repeat"
@@ -513,6 +597,7 @@ if(#{l.v}){
 	o += x + " --\></span>";
 }\n
 """
+			###
 			@cntxt.buildFunction += bf
 			@buildFunction += bf
 
