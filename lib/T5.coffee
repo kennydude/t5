@@ -51,7 +51,7 @@ var __getvar = function(raw_v, r, x){
 		if(stack.length > 0){
 			if(!x){ x = stack.length-1; }
 			else{ x = x - 1; }
-			if(x < 0){ return ""; }
+			if(x <= 0){ return ""; }
 			return __getvar(raw_v, stack[x], x);
 		}
 		return "";
@@ -78,11 +78,6 @@ if (typeof process !== 'undefined' && process.title == "node") {
 		@manageClassTPL = """
 this.element = element;
 if(!element) throw new Error("An element is required to attach the management class: " + this.constructor.name);
-if(element['classList']){
-	if(!element.classList.contains("t5-1")){
-		this.element = element.getElementsByClassName("t5-1")[0];
-	}
-}
 var self = this;
 
 data = data || {};
@@ -103,10 +98,23 @@ self.unbind	= function(event, fct){
 	self._events[event].splice(self._events[event].indexOf(fct), 1);
 };
 self.trigger = function(event /* , args... */){
+	if(Array.isArray(event)){
+		for(var i = 0; i < event.length; i++){
+			self.trigger.apply(self, [event[i]].concat( Array.prototype.slice.call(arguments, 1) ));
+		}
+		return;
+	}
+
 	self._events = self._events || {};
-	if( event in self._events === false  )	return;
-	for(var i = 0; i < self._events[event].length; i++){
-		self._events[event][i].apply(self, Array.prototype.slice.call(arguments, 1));
+	if( !( event in self._events === false  ) ){
+		for(var i = 0; i < self._events[event].length; i++){
+			self._events[event][i].apply(self, Array.prototype.slice.call(arguments, 1));
+		}
+	}
+	if(self.parent){
+		var args = Array.prototype.slice.call(arguments, 1);
+		args.unshift(event);
+		self.parent.trigger.apply(self.parent, args);
 	}
 };
 self.on = self.bind;
@@ -144,10 +152,16 @@ self._#{varname}
 attrs = { class : [] };\n
 """
 		lc = [] # holding place for extra actions
-		cEl = false
+		cEL = false
 		doChildren = true
 		name = "el#{@clsCounter}"
 		afterB = ""
+
+		if @clsCounter == 1
+			cEL = true
+
+		mcls = ""
+		mclsc = ""
 
 		# Do Attributes
 		if node.attrs
@@ -181,7 +195,7 @@ attrs = { class : [] };\n
 						mc = attribute.managementClass()
 
 						if mc.body && !attr.readOnly
-							@manageClass += mc.body
+							mcls += mc.body
 							# If there's a body, it's likely we'll need this!
 
 						if (mc.body || mc.recordNode) && !attr.readOnly
@@ -197,7 +211,7 @@ attrs = { class : [] };\n
 
 				"""
 						if mc.constructor
-							@manageClassConstructor += mc.constructor
+							mclsc += mc.constructor
 
 						for v, fname of mc.events
 							if !@cntxt.manageItems[v]
@@ -237,6 +251,9 @@ o += "<#{node.nodeName} " + doAttributes(attrs) + ">";\n
 					bf = r.replaceBuildFunction
 				if r.skipChildren
 					doChildren = false
+
+		@manageClass += mcls
+		@manageClassConstructor += mclsc
 
 		@buildFunction += bf
 		@cntxt.buildFunction += bf

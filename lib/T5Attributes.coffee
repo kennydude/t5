@@ -45,7 +45,7 @@ self._#{varname}
         }
     managementClass : () ->
         events = {}
-        if @statement
+        if @statement && @fname
             for v in @statement.vars()
                 events[v] = @fname
 
@@ -309,32 +309,16 @@ registerAttribute(@ContentsAttribute, "text")
 registerAttribute(@ContentsAttribute, "html")
 
 class @RepeatAttribute extends @SimpleAttribute
-    constructor: (attr, @name, cntxt, node, t5) ->
-        statement = new VariableStatement( attr.value )
-        statement.variableDealer = @variableDealer
-        @iv = statement.toJS()
-        statement.variableDealer = @manageVariableDealer
+    constructor: (@attr, @name, cntxt, node, t5) ->
+        @statement = new VariableStatement( attr.value )
+        @statement.variableDealer = @variableDealer
+        @iv = @statement.toJS()
+        @statement.variableDealer = @manageVariableDealer
 
+        @clsCounter = t5.clsCounter
         @recordNode = true
         @manageClassConstructor = """
-this.#{attr.value} = [];
-var els = #{cntxt.element}.getElementsByClassName("t5-#{t5.clsCounter}");
-for(var k in #{statement.toJS()}){
-    this.#{attr.value}.push( new #{t5.name}_sub#{@name}( els[k], #{statement.toJS()}[k]) );
-}
-this.#{attr.value}.push = function(item){
-    return (function(){
-        // add a new item
-        var el = document.createElement("div");
-        el.innerHTML = #{t5.name}_sub#{@name}.buildFunction(ent, item);
-        var elm = el.childNodes[0];
-        var els = #{cntxt.element}.getElementsByClassName("t5-#{t5.clsCounter}");
-        var is = els[ els.length - 1 ];
-        is.parentNode.insertBefore( elm, is.nextSibling );
-        var ni = new #{t5.name}_sub#{name}(elm, item);
-        return Array.prototype.push.apply(this, [ ni ]);
-    }).call(self, [item]);
-};\n
+
 """
     beforeChildren: (t5, bf) ->
         t5.stack.push t5.cntxt
@@ -344,7 +328,10 @@ this.#{attr.value}.push = function(item){
         t5.cntxt.name = "#{t5.name}_sub#{@name}"
 
         t5.stack.push t5.manageClassConstructor
-        t5.manageClassConstructor = ""
+        t5.manageClassConstructor = """
+    this.#{@name} = this.element;\n
+
+        """
 
         t5.stack.push t5.manageClass
         t5.manageClass = ""
@@ -396,6 +383,32 @@ return o;
 """
 
         t5.manageClassConstructor = t5.stack.pop()
+
+        t5.manageClassConstructor += """
+        this.#{@attr.value} = [];
+        var els = #{t5.cntxt.element}.getElementsByClassName("t5-#{@clsCounter}");
+        for(var k in #{@statement.toJS()}){
+            var ni = new #{t5.name}_sub#{@name}( els[k], #{@statement.toJS()}[k]);
+            ni.parent = self;
+            this.#{@attr.value}.push( ni );
+        }
+        this.#{@attr.value}.push = function(item){
+            return (function(){
+                // add a new item
+                var el = document.createElement("div");
+                el.innerHTML = #{t5.name}_sub#{@name}.buildFunction(ent, item);
+                var elm = el.childNodes[0];
+                var els = #{t5.cntxt.element}.getElementsByClassName("t5-#{@clsCounter}");
+                var is = els[ els.length - 1 ];
+                is.parentNode.insertBefore( elm, is.nextSibling );
+                var ni = new #{t5.name}_sub#{@name}(elm, item);
+                ni.parent = self;
+
+                return Array.prototype.push.apply(this, [ ni ]);
+            }).call(self, item);
+        };\n
+        """
+
         t5.cntxt = t5.stack.pop()
 
         return {
@@ -423,11 +436,10 @@ class @OnAttribute extends @SimpleAttribute
                         if v.trim() != ""
                             a.push v
 
-                    f = "function(e){ self.trigger(#{JSON.stringify(a)}).call(self); }"
+                    f = "function(e){ (function(){ this.trigger.apply(this, [#{JSON.stringify(a)}, e, this]); }).call(self); }"
                 else
                     f = "function(e){ (function(){ #{p[1]} }).call(self); }"
 
-                console.log "ON"
                 @manageClassConstructor += """
 this.#{name}.addEventListener(#{JSON.stringify(p[0])}, #{f});\n
 """
