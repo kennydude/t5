@@ -25,11 +25,17 @@ merge(require("./T5Attributes"))
 ent = require "ent"
 
 class T5Context
-	constructor : () ->
+	constructor : (old) ->
 		@element = "this.element"
 		@name = "TPL"
 		@manageItems = {}
 		@buildFunction = ""
+		@prefix = ""
+
+		if old
+			@element = old.element
+			@name = old.name
+			@prefix = old.prefix
 
 class T5
 	constructor : (@name) ->

@@ -18,6 +18,7 @@ thing
     "false" { return {"type":"false"} } /
     digits: [0-9] + { return {"type":"int", "value" : parseInt(digits.join(""), 10) } } /
     "\"" literal:anything "\"" { return {"type":"literal", "value": literal.join("") } } /
+    "\'" literal:anythingS "\'" { return {"type":"literal", "value": literal.join("") } } /
     variable
 
 variable
@@ -25,6 +26,8 @@ variable
 
 anything
   = ("\\\"" / [^\"]) +
+anythingS
+  = ("\\\'" / [^\']) +
 
 spacing
   = [ \t] * { return null }
