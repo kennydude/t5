@@ -167,14 +167,14 @@ attrs = { class : [] };\n
 		if node.attrs
 			# Try to find name
 			for attr in node.attrs
-				if attr.name == "data-name" || attr.name == "data-id"
+				if attr.name.toLowerCase() == "data-name" || attr.name.toLowerCase() == "data-id"
 					name = attr.value
 
 			for attr in node.attrs
 				if attr.name == "class"
 					bf += """attrs["class"].push(#{JSON.stringify(attr.value)});\n"""
 				else if attr.name.substr(0,5) == "data-" or attr.name.substr(0,2) == "v-"
-					atName = attr.name.substr( attr.name.indexOf("-")+1 )
+					atName = attr.name.substr( attr.name.indexOf("-")+1 ).toLowerCase()
 					attr.readOnly = false
 					if atName.charAt(0) == "$"
 						attr.readOnly = true
@@ -281,28 +281,60 @@ o += "</#{node.nodeName}>";\n
 			@cntxt.buildFunction += bf
 			@buildFunction += bf
 
-	doManageItems : () ->
-		# Setup watcher things
-		mc = ""
-		items = []
-		for k, watching of @cntxt.manageItems
-			# TOOD: deal with object.this.that
-			#console.log k, watching
-			items.push """
-#{JSON.stringify(k)} : self._#{k}\n
-"""
-			mc += """
-Object.defineProperty(this, "#{k}", {
+	visitNode : (k, v, ex) ->
+		if Array.isArray v
+			return """
+Object.defineProperty(#{ex}, "#{k}", {
 	get : function(){
-		return self._#{k};
+		return #{ex}._#{k};
 	},
 	set : function(v){
-		self._#{k} = v;
-		#{("self.#{v}();\n" for v in watching).join("")}
+		#{ex}._#{k} = v;
+		#{("self.#{v}();\n" for v in v).join("")}
 	}
 });
 
 """
+		else
+			cc = "#{ex}.#{k}"
+			return """
+Object.defineProperty(#{ex}, "#{k}", {
+	get : function(){
+		return #{ex}_#{k};
+	},
+	set : function(nv){
+		for(var k in nv){
+			var v = nv[k];
+			#{ex}._#{k}[k] = v;
+		}
+	}
+});
+#{@visitNode(nk, nv, cc) for nk, nv of v}
+"""
+
+	doManageItems : () ->
+		# Setup watcher things
+		mc = ""
+		items = []
+
+		things = {}
+
+		for k, watching of @cntxt.manageItems
+			p = k.split(".")
+			x = things
+			for part in p.slice(0, p.length-1)
+				if !x[part]
+					x[part] = {}
+				x = x[part]
+
+			x[ p[p.length-1] ] = watching
+
+		for k, v of things
+			items.push """
+#{JSON.stringify(k)} : self._#{k}\n
+"""
+			mc += @visitNode k, v, "self"
+			#mc +=
 
 		mc += """
 self.export = function(){

@@ -444,3 +444,10 @@ class @OnAttribute extends @SimpleAttribute
 this.#{name}.addEventListener(#{JSON.stringify(p[0])}, #{f});\n
 """
 registerAttribute(@OnAttribute, "on")
+
+class @WithAttribute extends @SimpleAttribute
+    constructor: (attr, name, cntxt) ->
+        @bf = """
+// todo
+"""
+registerAttribute(@WithAttribute, "with")
