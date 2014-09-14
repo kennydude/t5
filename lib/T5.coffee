@@ -281,36 +281,69 @@ o += "</#{node.nodeName}>";\n
 			@cntxt.buildFunction += bf
 			@buildFunction += bf
 
-	visitNode : (k, v, ex) ->
-		if Array.isArray v
-			return """
+	visitNode : (k, v, ex, pt) ->
+		if !v then return ''
+
+		inner = ''
+		o = ''
+
+		if v['_t5_wi']
+			inner = """
+			#{("self.#{x}();\n" for x in v['_t5_wi']).join("")}
+			"""
+			o = """
 Object.defineProperty(#{ex}, "#{k}", {
 	get : function(){
 		return #{ex}._#{k};
 	},
 	set : function(v){
+		console.log("set #{k}");
 		#{ex}._#{k} = v;
-		#{("self.#{v}();\n" for v in v).join("")}
+		#{inner}
+		#{pt}
 	}
 });
 
 """
-		else
-			cc = "#{ex}.#{k}"
-			return """
+			delete v['_t5_wi']
+
+		if Object.keys(v).length > 0
+
+			cc = "#{ex}._#{k}"
+			px = cc.replace(/\./g, '_')
+			###o = """
+#{cc} = {};
+self._update#{px} = function(){
+	#{inner}
+};
+"""###
+			o = """
+#{ex}._#{k} = {};
+
+self.update#{px} = function(){
+	#{inner}
+};
+
 Object.defineProperty(#{ex}, "#{k}", {
 	get : function(){
-		return #{ex}_#{k};
+		return #{ex}._#{k};
 	},
 	set : function(nv){
+		console.log("set #{k}");
 		for(var k in nv){
 			var v = nv[k];
 			#{ex}._#{k}[k] = v;
 		}
+		#{inner}
 	}
 });
-#{@visitNode(nk, nv, cc) for nk, nv of v}
 """
+
+			pt = "#{pt}\nself.update#{px}();"
+			if typeof v != "string"
+				o += (@visitNode(nk, nv, cc, pt) for nk, nv of v).join("\n")
+
+		return o
 
 	doManageItems : () ->
 		# Setup watcher things
@@ -327,13 +360,14 @@ Object.defineProperty(#{ex}, "#{k}", {
 					x[part] = {}
 				x = x[part]
 
-			x[ p[p.length-1] ] = watching
+			if !x[ p[p.length-1] ]
+				x[ p[p.length-1] ] = { _t5_wi : watching }
 
 		for k, v of things
 			items.push """
 #{JSON.stringify(k)} : self._#{k}\n
 """
-			mc += @visitNode k, v, "self"
+			mc += @visitNode k, v, "self", ""
 			#mc +=
 
 		mc += """

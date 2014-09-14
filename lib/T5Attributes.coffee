@@ -441,13 +441,39 @@ class @OnAttribute extends @SimpleAttribute
                     f = "function(e){ (function(){ #{p[1]} }).call(self); }"
 
                 @manageClassConstructor += """
-this.#{name}.addEventListener(#{JSON.stringify(p[0])}, #{f});\n
+this.#{name}.addEventListener(#{JSON.stringify(p[0].trim())}, #{f});\n
 """
 registerAttribute(@OnAttribute, "on")
 
 class @WithAttribute extends @SimpleAttribute
-    constructor: (attr, name, cntxt) ->
+    constructor: (attr, name, cntxt, node, t5) ->
+        t5.stack.push t5.context
+        @val = attr.value
+
         @bf = """
-// todo
+stack.push(context);
+context = context[#{JSON.stringify(attr.value)}];
+var obj = context;
+if(typeof context != "object"){
+    context = {};
+}
 """
+    afterChildren: (t5) ->
+        mi = t5.cntxt.manageItems
+        t5.cntxt = t5.stack.pop
+        console.log t5.cntxt.manageItems, mi
+
+        if !t5.cntxt.manageItems
+            t5.cntxt.manageItems = []
+
+        for k, v of mi
+            t5.cntxt.manageItems[ "#{@val}.#{k}" ] = v
+        console.log t5.cntxt.manageItems
+
+        return {
+            buildFunction : """
+                context = stack.pop(context);
+            """
+        }
+
 registerAttribute(@WithAttribute, "with")
