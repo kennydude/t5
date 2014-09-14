@@ -236,12 +236,12 @@ o += "<span data-if=\\"1\\" class=\\"t5-#{t5.clsCounter}\\"><!-- [t5] ";\n
         return {
             replaceBuildFunction : """
 if(#{@iv}){
-#{bf}
+    #{bf}
 } else{
-#{f}
-var to = o;
-o = "";
-#{bf}
+    #{f}
+    var to#{@fname} = o;
+    o = "";
+    #{bf}
 }\n
 """
         }
@@ -266,7 +266,7 @@ if(#{@iv}){
 } else{
     #{bf}
     var x = btoa(o);
-    o = to;
+    o = to#{@fname};
     #{f}
 }\n
 """

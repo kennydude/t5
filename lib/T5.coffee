@@ -284,9 +284,13 @@ o += "</#{node.nodeName}>";\n
 	doManageItems : () ->
 		# Setup watcher things
 		mc = ""
+		items = []
 		for k, watching of @cntxt.manageItems
 			# TOOD: deal with object.this.that
 			#console.log k, watching
+			items.push """
+#{JSON.stringify(k)} : self._#{k}\n
+"""
 			mc += """
 Object.defineProperty(this, "#{k}", {
 	get : function(){
@@ -299,6 +303,13 @@ Object.defineProperty(this, "#{k}", {
 });
 
 """
+
+		mc += """
+self.export = function(){
+	return { #{items.join(",")} }
+};
+"""
+
 		@manageClassConstructor = "#{mc}\n\n#{@manageClassConstructor}"
 
 	compile : (str) ->
