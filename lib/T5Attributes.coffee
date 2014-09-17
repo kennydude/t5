@@ -187,8 +187,8 @@ class @ModelAttribute extends @SimpleAttribute
         if accepted.indexOf(node.nodeName) == -1
             throw new Error("data-model is only allowed on " + accepted + " elements")
 
-        bf += """
-var v = #{statement.toJS()};
+        @bf = """
+var v = #{@statement.toJS()};
 if(v){
 attrs["value"] = v;
 }
@@ -201,12 +201,12 @@ attrs["value"] = v;
 #{cntxt.name}.prototype.#{@fname} = function(){
     var self = this;
     if(this._modelChanged_IP#{name}) return;
-    this.#{name}.value = #{statement.toJS()};
+    this.#{name}.value = #{@statement.toJS()};
 };
 #{cntxt.name}.prototype._modelChanged_#{name} = function(){
     var self = this;
     this._modelChanged_IP#{name} = true;
-    #{statement.toJS()} = this.#{name}.value;
+    #{@statement.toJS()} = this.#{name}.value;
     this.trigger("#{name}-changed");
     this._modelChanged_IP#{name} = false;
 }
