@@ -175,6 +175,7 @@ attrs = { class : [] };\n
 			for attr in node.attrs
 				if attr.name.toLowerCase() == "data-name" || attr.name.toLowerCase() == "data-id"
 					name = attr.value
+					cEL = true
 
 			for attr in node.attrs
 				if attr.name == "class"
