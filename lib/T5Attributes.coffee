@@ -97,7 +97,7 @@ attrs["class"].push(#{JSON.stringify(p[0])});
 }
 
 """
-                @fname = "_inTPL#{@name}_class#{lineNo}"
+                @fname = "_inTPL#{name}_class#{lineNo}"
                 statement.variableDealer = @manageVariableDealer
 
                 cls = p[0].split(" ")
@@ -130,6 +130,8 @@ class @AttributeAttribute extends @SimpleAttribute
         for lineNo, line of l
             if line.trim() != ""
                 p = line.split(":", 2)
+                p[0] = p[0].trim()
+
                 statement = new ConcatStatement( p[1] )
                 statement.variableDealer = @variableDealer
                 @addVars statement
@@ -197,7 +199,7 @@ attrs["value"] = v;
         @fname = "_inTPL#{name}_model"
 
         @statement.variableDealer = @manageVariableDealer
-        @manageClass += """
+        @manageClass = """
 #{cntxt.name}.prototype.#{@fname} = function(){
     var self = this;
     if(this._modelChanged_IP#{name}) return;

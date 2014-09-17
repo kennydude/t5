@@ -207,16 +207,6 @@ attrs = { class : [] };\n
 
 						if (mc.body || mc.recordNode) && !attr.readOnly
 							cEL = true
-							if node.parentNode.nodeName == "#document-fragment" # Top-level element
-								@manageClassConstructor += """
-				this.#{name} = #{@cntxt.element};
-
-				"""
-							else
-								@manageClassConstructor += """
-				this.#{name} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCounter}")[0];
-
-				"""
 						if mc.constructor
 							mclsc += mc.constructor
 
@@ -233,6 +223,16 @@ attrs = { class : [] };\n
 
 		if cEL
 			bf += """attrs["class"].push("t5-#{@clsCounter}");"""
+			if node.parentNode.nodeName == "#document-fragment" # Top-level element
+				@manageClassConstructor += """
+	this.#{name} = #{@cntxt.element};
+
+	"""
+			else
+				@manageClassConstructor += """
+	this.#{name} = #{@cntxt.element}.getElementsByClassName("t5-#{@clsCounter}")[0];
+
+	"""
 
 		if node.nodeName.charAt(0) != "#"
 			bf += """
