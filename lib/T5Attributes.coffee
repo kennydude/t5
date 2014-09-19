@@ -129,7 +129,7 @@ class @AttributeAttribute extends @SimpleAttribute
 
         for lineNo, line of l
             if line.trim() != ""
-                p = line.split(":", 2)
+                p = line.trim().split(":", 2)
                 p[0] = p[0].trim()
 
                 statement = new ConcatStatement( p[1] )
